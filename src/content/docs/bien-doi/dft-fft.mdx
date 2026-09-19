@@ -1,0 +1,24 @@
+---
+title: DFT và FFT
+description: Phân tích phổ hữu hạn và thuật toán tính nhanh.
+sidebar:
+  order: 1
+---
+
+DFT biến đổi $N$ mẫu trong miền thời gian thành $N$ hệ số phổ:
+
+$$
+X[k] = \sum_{n=0}^{N-1}x[n]e^{-j2\pi kn/N}, \quad k=0,1,\ldots,N-1.
+$$
+
+FFT không phải một phép biến đổi mới. Nó là họ thuật toán tính DFT hiệu quả, giảm độ phức tạp điển hình từ $O(N^2)$ xuống $O(N\log N)$.
+
+## Ba điều cần kiểm tra khi đọc phổ
+
+1. Trục tần số có dùng Hz hay tần số chuẩn hóa?
+2. Biên độ đã chia cho $N$ và hiệu chỉnh phổ một phía chưa?
+3. Tín hiệu có vừa khít số chu kỳ trong cửa sổ quan sát không?
+
+:::caution[Spectral leakage]
+Khi đoạn quan sát cắt tín hiệu ở vị trí không liên tục, năng lượng của một thành phần sin bị trải sang nhiều bin tần số. Zero-padding làm đồ thị mịn hơn nhưng không loại bỏ leakage.
+:::

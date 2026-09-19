@@ -1,0 +1,46 @@
+---
+title: Xử lý tín hiệu số
+description: Giáo trình DSP bằng tiếng Việt, kết hợp trực giác, toán học và thực hành.
+template: splash
+hero:
+  tagline: Hiểu tín hiệu bằng trực giác. Kiểm chứng bằng toán học. Biến kiến thức thành bộ lọc và hệ thống hoạt động được.
+  actions:
+    - text: Bắt đầu học
+      link: /nen-tang/tin-hieu-roi-rac/
+      icon: right-arrow
+      variant: primary
+    - text: Xem lộ trình
+      link: /lo-trinh/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import CourseStats from '../../components/CourseStats.astro';
+
+<CourseStats />
+
+## Học DSP như một kỹ sư
+
+Khóa học nối ba lớp kiến thức thường bị tách rời: **trực giác về tín hiệu**, **mô hình toán học** và **khả năng triển khai**. Mỗi chủ đề bắt đầu bằng câu hỏi thực tế, phát triển công cụ toán cần thiết, rồi kết thúc bằng thí nghiệm có thể chạy và quan sát.
+
+<CardGrid>
+  <Card title="Nhìn thấy tín hiệu" icon="seti:eye">
+    Đồ thị và mô phỏng giúp bạn thấy convolution, phổ, lấy mẫu và đáp ứng bộ lọc thay đổi ra sao.
+  </Card>
+  <Card title="Nắm chắc toán học" icon="seti:notebook">
+    Công thức được xây dựng từng bước, gắn với ý nghĩa vật lý thay vì chỉ là phép biến đổi ký hiệu.
+  </Card>
+  <Card title="Tự tay triển khai" icon="seti:config">
+    Các bài lab đưa thuật toán từ notebook sang mã nguồn có thể kiểm thử và tái sử dụng.
+  </Card>
+</CardGrid>
+
+## Điểm xuất phát
+
+<CardGrid stagger>
+  <LinkCard title="Tín hiệu rời rạc" description="Biểu diễn, dịch thời gian, co giãn và năng lượng tín hiệu." href="/nen-tang/tin-hieu-roi-rac/" />
+  <LinkCard title="Hệ LTI và tích chập" description="Từ đáp ứng xung đến công thức convolution." href="/nen-tang/he-lti-va-tich-chap/" />
+  <LinkCard title="Lấy mẫu và aliasing" description="Khám phá trực tiếp điều kiện Nyquist." href="/labs/lay-mau/" />
+  <LinkCard title="DFT và FFT" description="Đọc phổ đúng cách và tránh các bẫy thường gặp." href="/bien-doi/dft-fft/" />
+</CardGrid>

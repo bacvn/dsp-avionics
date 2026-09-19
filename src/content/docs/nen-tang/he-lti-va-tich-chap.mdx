@@ -1,0 +1,29 @@
+---
+title: Hệ LTI và tích chập
+description: Hiểu hệ tuyến tính bất biến theo thời gian qua đáp ứng xung.
+sidebar:
+  order: 2
+---
+
+Hệ tuyến tính bất biến theo thời gian được xác định hoàn toàn bởi đáp ứng xung $h[n]$. Đầu ra ứng với đầu vào bất kỳ được tính bằng tích chập:
+
+$$
+y[n] = x[n] * h[n] = \sum_{k=-\infty}^{\infty} x[k]h[n-k].
+$$
+
+## Cách đọc công thức
+
+1. Giữ $x[k]$ cố định.
+2. Đảo $h[k]$ thành $h[-k]$.
+3. Dịch thành $h[n-k]$.
+4. Nhân hai dãy tại từng vị trí và cộng kết quả.
+
+Nếu $h[n]$ có tổng tuyệt đối hữu hạn thì hệ LTI là BIBO ổn định:
+
+$$
+\sum_{n=-\infty}^{\infty}|h[n]| < \infty.
+$$
+
+:::note[Trực giác]
+Đáp ứng xung là “dấu vân tay” của hệ. Tích chập tổng hợp nhiều bản sao dịch và đổi biên độ của dấu vân tay đó.
+:::

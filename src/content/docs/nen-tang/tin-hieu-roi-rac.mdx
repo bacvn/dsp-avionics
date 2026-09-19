@@ -1,0 +1,30 @@
+---
+title: Tín hiệu rời rạc
+description: Ngôn ngữ cơ bản để mô tả và thao tác tín hiệu số.
+sidebar:
+  order: 1
+---
+
+Một tín hiệu rời rạc là một dãy số $x[n]$, trong đó chỉ số $n$ nhận giá trị nguyên. Dãy có thể là kết quả lấy mẫu âm thanh, số đo cảm biến hoặc dữ liệu trung gian trong một thuật toán.
+
+## Ba phép biến đổi cơ bản
+
+- **Dịch thời gian:** $y[n] = x[n-n_0]$.
+- **Đảo thời gian:** $y[n] = x[-n]$.
+- **Thay đổi biên độ:** $y[n] = A x[n]$.
+
+Với tín hiệu mũ phức
+
+$$
+x[n] = A e^{j(\omega_0 n + \phi)},
+$$
+
+$A$ quyết định biên độ, $\omega_0$ là tần số góc chuẩn hóa và $\phi$ là pha ban đầu.
+
+:::caution[Tần số rời rạc có tính tuần hoàn]
+$\omega_0$ và $\omega_0 + 2\pi k$ mô tả cùng một tín hiệu rời rạc. Đây là khác biệt quan trọng so với tín hiệu liên tục.
+:::
+
+## Bài kiểm tra nhanh
+
+Cho $x[n] = \delta[n] + 2\delta[n-1]$. Hãy phác thảo $x[-n+2]$ và xác định vị trí của từng mẫu khác không.

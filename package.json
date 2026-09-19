@@ -1,0 +1,24 @@
+{
+  "name": "dsp-avionics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/check": "latest",
+    "@astrojs/markdown-remark": "^7.3.1",
+    "@astrojs/starlight": "latest",
+    "astro": "latest",
+    "katex": "latest",
+    "rehype-katex": "latest",
+    "remark-math": "latest",
+    "typescript": "^6.0.3"
+  },
+  "packageManager": "pnpm@11.19.0"
+}

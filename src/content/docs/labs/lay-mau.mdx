@@ -1,0 +1,28 @@
+---
+title: Lab — Lấy mẫu và aliasing
+description: Thay đổi tần số tín hiệu và tần số lấy mẫu để quan sát điều kiện Nyquist.
+sidebar:
+  order: 1
+---
+
+import SamplingLab from '../../../components/SamplingLab.astro';
+
+Theo định lý lấy mẫu, một tín hiệu giới hạn băng có tần số cao nhất $f_{max}$ có thể được khôi phục khi
+
+$$
+f_s > 2f_{max}.
+$$
+
+Trong mô phỏng dưới đây, đường xanh là tín hiệu liên tục và các cọc màu là mẫu rời rạc. Hãy tăng tần số tín hiệu hoặc giảm tần số lấy mẫu cho đến khi cảnh báo aliasing xuất hiện.
+
+<SamplingLab />
+
+## Câu hỏi quan sát
+
+1. Ở sát giới hạn $f_s = 2f$, vị trí pha ban đầu ảnh hưởng thế nào đến các mẫu?
+2. Khi $f_s < 2f$, bạn có thể tìm một tín hiệu tần số thấp hơn đi qua đúng các điểm mẫu không?
+3. Vì sao trong hệ thống thực tế người ta cần bộ lọc chống alias trước ADC?
+
+:::tip[Thử nhanh]
+Đặt $f=12$ Hz và $f_s=16$ Hz. Dãy mẫu quan sát được có thể bị hiểu nhầm thành một tín hiệu 4 Hz.
+:::

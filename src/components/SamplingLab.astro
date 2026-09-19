@@ -1,0 +1,82 @@
+---
+const id = `sampling-${Math.random().toString(36).slice(2)}`;
+---
+
+<section class="sampling-lab" id={id}>
+  <div class="lab-head">
+    <div>
+      <span class="eyebrow">MÔ PHỎNG TRỰC TIẾP</span>
+      <h3>Lấy mẫu tín hiệu hình sin</h3>
+    </div>
+    <output class="status" aria-live="polite">Đủ điều kiện Nyquist</output>
+  </div>
+  <canvas width="840" height="330" aria-label="Đồ thị tín hiệu liên tục và các mẫu rời rạc"></canvas>
+  <div class="controls">
+    <label>Tần số tín hiệu <strong data-signal-value>5 Hz</strong><input data-signal type="range" min="1" max="20" value="5" step="1" /></label>
+    <label>Tần số lấy mẫu <strong data-sample-value>16 Hz</strong><input data-sample type="range" min="4" max="50" value="16" step="1" /></label>
+  </div>
+</section>
+
+<script define:vars={{ id }}>
+  const root = document.getElementById(id);
+  const canvas = root.querySelector('canvas');
+  const ctx = canvas.getContext('2d');
+  const signal = root.querySelector('[data-signal]');
+  const sample = root.querySelector('[data-sample]');
+  const signalValue = root.querySelector('[data-signal-value]');
+  const sampleValue = root.querySelector('[data-sample-value]');
+  const status = root.querySelector('.status');
+
+  function draw() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const box = canvas.getBoundingClientRect();
+    canvas.width = box.width * dpr;
+    canvas.height = box.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const w = box.width, h = box.height, mid = h / 2;
+    const f = Number(signal.value), fs = Number(sample.value);
+    signalValue.textContent = `${f} Hz`;
+    sampleValue.textContent = `${fs} Hz`;
+    const safe = fs >= 2 * f;
+    status.textContent = safe ? 'Đủ điều kiện Nyquist' : 'Aliasing sẽ xảy ra';
+    status.dataset.safe = String(safe);
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = getComputedStyle(root).getPropertyValue('--grid');
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= w; x += w / 8) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (let y = 0; y <= h; y += h / 4) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    ctx.strokeStyle = '#58e6d9'; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (let x = 0; x <= w; x += 2) {
+      const t = x / w;
+      const y = mid - Math.sin(2 * Math.PI * f * t) * h * .32;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    const count = Math.floor(fs) + 1;
+    ctx.strokeStyle = safe ? '#ffba67' : '#ff6b81';
+    ctx.fillStyle = ctx.strokeStyle;
+    for (let n = 0; n < count; n++) {
+      const t = n / fs, x = t * w, y = mid - Math.sin(2 * Math.PI * f * t) * h * .32;
+      ctx.beginPath(); ctx.moveTo(x, mid); ctx.lineTo(x, y); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  signal.addEventListener('input', draw);
+  sample.addEventListener('input', draw);
+  new ResizeObserver(draw).observe(canvas);
+</script>
+
+<style>
+  .sampling-lab { --grid: color-mix(in srgb, var(--sl-color-gray-4) 45%, transparent); margin: 1.75rem 0; padding: 1.1rem; border: 1px solid var(--sl-color-gray-5); border-radius: 1rem; background: #091b34; color: #f5fbff; }
+  .lab-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+  .lab-head h3 { margin:.15rem 0 0; font-size:1.1rem; color:#f5fbff; }
+  .eyebrow { color:#58e6d9; font-size:.7rem; font-weight:800; letter-spacing:.12em; }
+  .status { padding:.35rem .7rem; border-radius:999px; background:#0c4b4b; color:#a9fff5; font-size:.75rem; font-weight:700; }
+  .status[data-safe='false'] { background:#56263a; color:#ffc3cf; }
+  canvas { display:block; width:100%; height:260px; margin:1rem 0; border-radius:.6rem; }
+  .controls { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  label { display:grid; grid-template-columns:1fr auto; gap:.45rem; font-size:.82rem; color:#b9cce0; }
+  label strong { color:#f5fbff; }
+  input { grid-column:1 / -1; width:100%; accent-color:#58e6d9; }
+  @media (max-width: 34rem) { .controls { grid-template-columns:1fr; } .status { max-width:8rem; text-align:center; } }
+</style>
