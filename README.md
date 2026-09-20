@@ -1,6 +1,6 @@
 # DSP Avionics
 
-Website giảng dạy Xử lý tín hiệu số bằng tiếng Việt tại `avionics.vn`.
+Website giảng dạy Xử lý tín hiệu số bằng tiếng Việt tại `dsp.avionics.vn`.
 
 ## Phát triển cục bộ
 
