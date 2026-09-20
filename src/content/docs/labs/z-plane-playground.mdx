@@ -1,0 +1,37 @@
+---
+title: Lab — Z-plane Playground
+description: Kéo một điểm trên mặt phẳng z và quan sát quỹ đạo phức cùng hai thành phần của z mũ n.
+sidebar:
+  order: 2
+---
+
+import ZPlanePlayground from '../../../components/ZPlanePlayground.astro';
+
+## Mục tiêu
+
+Liên hệ trực tiếp vị trí của một điểm $z = re^{j\omega}$ với dãy thời gian phức
+
+$$
+z^n = r^n e^{j\omega n} = r^n\cos(\omega n) + j\,r^n\sin(\omega n).
+$$
+
+Kéo điểm trên mặt phẳng z hoặc dùng các thanh trượt. Đường tròn đơn vị là mốc quan trọng: bên trong đường tròn, biên độ giảm dần; trên đường tròn, biên độ không đổi; bên ngoài đường tròn, biên độ tăng dần.
+
+<ZPlanePlayground />
+
+## Cách đọc thí nghiệm
+
+- Bán kính $r=|z|$ điều khiển đường bao biên độ $r^n$.
+- Góc $\omega=\arg(z)$ điều khiển tốc độ quay và tần số dao động chuẩn hóa.
+- Với tần số lấy mẫu $f_s$, tần số vật lý là $f=\omega f_s/(2\pi)$ Hz.
+- Hai stem plot là các mẫu rời rạc; đường mờ nối giữa chúng là phần mở rộng liên tục để quan sát xu hướng trước khi lấy mẫu.
+
+:::note[Tần số lấy mẫu thay đổi điều gì?]
+Khi giữ nguyên $\omega$, dãy theo chỉ số $n$ không đổi. Thay đổi $f_s$ chỉ thay đổi ánh xạ từ rad/mẫu sang Hz và khoảng thời gian giữa hai mẫu $T_s=1/f_s$.
+:::
+
+## Câu hỏi quan sát
+
+1. Điều gì xảy ra với quỹ đạo 3D khi $r$ lần lượt nhỏ hơn, bằng và lớn hơn 1?
+2. Hai điểm có góc $\omega$ và $-\omega$ tạo ra phần thực và phần ảo khác nhau thế nào?
+3. Với cùng $\omega=0.4\pi$, hãy so sánh tần số vật lý khi $f_s=100$ Hz và $f_s=250$ Hz.

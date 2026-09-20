@@ -1,0 +1,298 @@
+---
+const id = `zplane-${Math.random().toString(36).slice(2)}`;
+---
+
+<section class="z-playground" id={id}>
+  <header class="z-header">
+    <div>
+      <span class="eyebrow">Z-PLANE PLAYGROUND</span>
+      <h2>Một điểm trên mặt phẳng z tạo ra tín hiệu như thế nào?</h2>
+    </div>
+    <output class="z-readout" data-readout aria-live="polite">z = 0.81 + j0.59</output>
+  </header>
+
+  <div class="z-layout">
+    <section class="z-panel z-controls-panel" aria-labelledby={`${id}-plane-title`}>
+      <div class="panel-title">
+        <div>
+          <span class="panel-index">01</span>
+          <h3 id={`${id}-plane-title`}>Chọn điểm z</h3>
+        </div>
+        <span class="hint">Kéo điểm hoặc dùng phím mũi tên</span>
+      </div>
+      <canvas class="z-plane" width="620" height="620" tabindex="0" role="img" aria-label="Mặt phẳng z tương tác với đường tròn đơn vị và một điểm có thể kéo"></canvas>
+
+      <div class="z-sliders">
+        <label>
+          <span>Bán kính <i>r</i></span>
+          <strong data-r-value>1.00</strong>
+          <input data-r type="range" min="0" max="1.5" value="1" step="0.01" />
+        </label>
+        <label>
+          <span>Góc <i>ω</i></span>
+          <strong data-omega-value>0.20π rad/mẫu</strong>
+          <input data-omega type="range" min="-3.141593" max="3.141593" value="0.628319" step="0.005" />
+        </label>
+        <label>
+          <span>Tần số lấy mẫu <i>f<sub>s</sub></i></span>
+          <strong data-fs-value>100 Hz</strong>
+          <input data-fs type="range" min="20" max="500" value="100" step="5" />
+        </label>
+      </div>
+    </section>
+
+    <section class="z-panel z-signal-panel" aria-labelledby={`${id}-signal-title`}>
+      <div class="panel-title">
+        <div>
+          <span class="panel-index">02</span>
+          <h3 id={`${id}-signal-title`}>Quan sát zⁿ</h3>
+        </div>
+        <span class="signal-meta" data-meta>f = 10.00 Hz · biên độ không đổi</span>
+      </div>
+
+      <div class="plot-block plot-3d">
+        <span class="plot-label">Quỹ đạo phức 3D</span>
+        <canvas data-spiral width="980" height="520" role="img" aria-label="Quỹ đạo xoắn ốc ba chiều của z mũ n theo thời gian"></canvas>
+      </div>
+
+      <div class="projection-grid">
+        <div class="plot-block">
+          <span class="plot-label"><i>Re</i>(zⁿ) = rⁿ cos(ωn)</span>
+          <canvas data-real width="470" height="300" role="img" aria-label="Stem plot phần thực của z mũ n và đường liên tục tham chiếu"></canvas>
+        </div>
+        <div class="plot-block">
+          <span class="plot-label"><i>Im</i>(zⁿ) = rⁿ sin(ωn)</span>
+          <canvas data-imag width="470" height="300" role="img" aria-label="Stem plot phần ảo của z mũ n và đường liên tục tham chiếu"></canvas>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+
+<script define:vars={{ id }}>
+  const root = document.getElementById(id);
+  const plane = root.querySelector('.z-plane');
+  const spiral = root.querySelector('[data-spiral]');
+  const realPlot = root.querySelector('[data-real]');
+  const imagPlot = root.querySelector('[data-imag]');
+  const rInput = root.querySelector('[data-r]');
+  const omegaInput = root.querySelector('[data-omega]');
+  const fsInput = root.querySelector('[data-fs]');
+  const rValue = root.querySelector('[data-r-value]');
+  const omegaValue = root.querySelector('[data-omega-value]');
+  const fsValue = root.querySelector('[data-fs-value]');
+  const readout = root.querySelector('[data-readout]');
+  const meta = root.querySelector('[data-meta]');
+  const N = 36;
+  let dragging = false;
+
+  function colors() {
+    const dark = document.documentElement.dataset.theme !== 'light';
+    return dark ? {
+      bg: '#091b34', grid: '#27425f', axis: '#7890a7', text: '#dcebf5', muted: '#7890a7',
+      cyan: '#58e6d9', orange: '#ffba67', purple: '#bfa5ff', faintCyan: 'rgba(88,230,217,.26)', faintOrange: 'rgba(255,186,103,.26)'
+    } : {
+      bg: '#f7fbfc', grid: '#d7e2e8', axis: '#668096', text: '#10243b', muted: '#6f879a',
+      cyan: '#087c7a', orange: '#c66312', purple: '#7355bb', faintCyan: 'rgba(8,124,122,.22)', faintOrange: 'rgba(198,99,18,.22)'
+    };
+  }
+
+  function setupCanvas(canvas) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const box = canvas.getBoundingClientRect();
+    const width = Math.max(280, box.width);
+    const height = Math.max(180, box.height);
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w: width, h: height };
+  }
+
+  function state() {
+    return { r: Number(rInput.value), omega: Number(omegaInput.value), fs: Number(fsInput.value) };
+  }
+
+  function formatComplex(r, omega) {
+    const re = r * Math.cos(omega);
+    const im = r * Math.sin(omega);
+    return `z = ${re.toFixed(2)} ${im >= 0 ? '+' : '−'} j${Math.abs(im).toFixed(2)}`;
+  }
+
+  function updateLabels() {
+    const { r, omega, fs } = state();
+    const hz = omega * fs / (2 * Math.PI);
+    const envelope = r < 0.995 ? 'tắt dần' : r > 1.005 ? 'tăng dần' : 'biên độ không đổi';
+    rValue.textContent = r.toFixed(2);
+    omegaValue.textContent = `${(omega / Math.PI).toFixed(2)}π rad/mẫu`;
+    fsValue.textContent = `${fs} Hz`;
+    readout.textContent = formatComplex(r, omega);
+    meta.textContent = `f = ${hz.toFixed(2)} Hz · ${envelope}`;
+  }
+
+  function drawPlane() {
+    const { ctx, w, h } = setupCanvas(plane);
+    const c = colors();
+    const size = Math.min(w, h);
+    const cx = w / 2, cy = h / 2, scale = size * .285;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = c.bg; ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = c.grid; ctx.lineWidth = 1;
+    for (let k = -1.5; k <= 1.5; k += .5) {
+      ctx.beginPath(); ctx.moveTo(cx + k * scale, cy - 1.55 * scale); ctx.lineTo(cx + k * scale, cy + 1.55 * scale); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - 1.55 * scale, cy - k * scale); ctx.lineTo(cx + 1.55 * scale, cy - k * scale); ctx.stroke();
+    }
+    ctx.strokeStyle = c.axis; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(cx - 1.62 * scale, cy); ctx.lineTo(cx + 1.62 * scale, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy - 1.62 * scale); ctx.lineTo(cx, cy + 1.62 * scale); ctx.stroke();
+    ctx.fillStyle = c.muted; ctx.font = '12px system-ui';
+    ctx.fillText('Re{z}', cx + 1.28 * scale, cy - 9);
+    ctx.fillText('Im{z}', cx + 9, cy - 1.42 * scale);
+    ctx.textAlign = 'center'; ctx.fillText('1', cx + scale, cy + 17); ctx.fillText('−1', cx - scale, cy + 17);
+
+    ctx.strokeStyle = c.purple; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+    ctx.beginPath(); ctx.arc(cx, cy, scale, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = c.purple; ctx.textAlign = 'left'; ctx.fillText('|z| = 1', cx + scale * .69, cy - scale * .73);
+
+    const { r, omega } = state();
+    const px = cx + r * Math.cos(omega) * scale;
+    const py = cy - r * Math.sin(omega) * scale;
+    ctx.strokeStyle = c.faintCyan; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py); ctx.stroke();
+    ctx.strokeStyle = c.cyan; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, r * scale, -omega, 0, omega >= 0); ctx.stroke();
+    ctx.fillStyle = c.cyan; ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = c.bg; ctx.lineWidth = 3; ctx.stroke();
+  }
+
+  function sequence() {
+    const { r, omega } = state();
+    return Array.from({ length: N }, (_, n) => {
+      const amp = Math.pow(r, n);
+      return { n, re: amp * Math.cos(omega * n), im: amp * Math.sin(omega * n) };
+    });
+  }
+
+  function signalScale(data) {
+    const max = Math.max(1, ...data.flatMap(d => [Math.abs(d.re), Math.abs(d.im)]));
+    return max;
+  }
+
+  function drawSpiral(data) {
+    const { ctx, w, h } = setupCanvas(spiral);
+    const c = colors();
+    const max = signalScale(data);
+    const pad = { l: 52, r: 30, t: 25, b: 42 };
+    const xSpan = w - pad.l - pad.r;
+    const amp = Math.min(h * .25, 115) / max;
+    const skewX = Math.min(42, w * .055);
+    const skewY = Math.min(22, h * .08);
+    const project = (n, re, im) => ({
+      x: pad.l + (n / (N - 1)) * (xSpan - skewX) + im * amp * .42,
+      y: h * .53 - re * amp - im * skewY / max,
+    });
+    ctx.clearRect(0, 0, w, h); ctx.fillStyle = c.bg; ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = c.grid; ctx.lineWidth = 1;
+    [-1, 0, 1].forEach(v => {
+      const a = project(0, v * max, 0), b = project(N - 1, v * max, 0);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    });
+    const origin = project(0, 0, 0), xEnd = project(N - 1, 0, 0), reEnd = project(0, max, 0), imEnd = project(0, 0, max);
+    ctx.strokeStyle = c.axis; ctx.lineWidth = 1.4;
+    [[origin, xEnd], [origin, reEnd], [origin, imEnd]].forEach(([a,b]) => { ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); });
+    ctx.fillStyle = c.muted; ctx.font = '12px system-ui';
+    ctx.fillText('n', xEnd.x - 5, xEnd.y + 22); ctx.fillText('Re', reEnd.x + 5, reEnd.y); ctx.fillText('Im', imEnd.x + 6, imEnd.y + 4);
+
+    ctx.strokeStyle = c.cyan; ctx.lineWidth = 2.4; ctx.beginPath();
+    data.forEach((d, i) => { const p = project(d.n, d.re, d.im); i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y); }); ctx.stroke();
+    data.forEach((d, i) => { if (i % 3) return; const p = project(d.n,d.re,d.im); ctx.fillStyle = c.orange; ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill(); });
+  }
+
+  function drawProjection(canvas, key, lineColor, faintColor, data) {
+    const { ctx, w, h } = setupCanvas(canvas);
+    const c = colors();
+    const { r, omega, fs } = state();
+    const max = signalScale(data);
+    const pad = { l: 44, r: 14, t: 18, b: 34 };
+    const x = n => pad.l + n / (N - 1) * (w - pad.l - pad.r);
+    const y = v => h / 2 - v / max * (h / 2 - pad.t - 8);
+    ctx.clearRect(0,0,w,h); ctx.fillStyle = c.bg; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle = c.grid; ctx.lineWidth = 1;
+    [-1,0,1].forEach(v => { const yy=y(v*max); ctx.beginPath(); ctx.moveTo(pad.l,yy); ctx.lineTo(w-pad.r,yy); ctx.stroke(); });
+    [0, Math.round((N-1)/2), N-1].forEach(n => { const xx=x(n); ctx.beginPath(); ctx.moveTo(xx,pad.t); ctx.lineTo(xx,h-pad.b); ctx.stroke(); });
+    ctx.strokeStyle = c.axis; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(pad.l,y(0)); ctx.lineTo(w-pad.r,y(0)); ctx.stroke();
+    ctx.fillStyle=c.muted; ctx.font='11px system-ui'; ctx.textAlign='center';
+    [0, Math.round((N-1)/2), N-1].forEach(n => ctx.fillText(`${(n/fs).toFixed(2)} s`,x(n),h-10));
+    ctx.textAlign='right'; ctx.fillText(max.toFixed(max > 10 ? 0 : 1),pad.l-6,y(max)+4); ctx.fillText((-max).toFixed(max > 10 ? 0 : 1),pad.l-6,y(-max)+4);
+
+    ctx.strokeStyle=faintColor; ctx.lineWidth=1.7; ctx.beginPath();
+    for(let q=0;q<=(N-1)*8;q++) { const n=q/8, a=Math.pow(r,n), v=key==='re'?a*Math.cos(omega*n):a*Math.sin(omega*n); const px=x(n),py=y(v); q?ctx.lineTo(px,py):ctx.moveTo(px,py); } ctx.stroke();
+    ctx.strokeStyle=lineColor; ctx.fillStyle=lineColor; ctx.lineWidth=1.4;
+    data.forEach(d => { const px=x(d.n),py=y(d[key]); ctx.beginPath();ctx.moveTo(px,y(0));ctx.lineTo(px,py);ctx.stroke();ctx.beginPath();ctx.arc(px,py,2.7,0,Math.PI*2);ctx.fill(); });
+  }
+
+  function draw() {
+    updateLabels(); drawPlane();
+    const data = sequence(), c = colors();
+    drawSpiral(data);
+    drawProjection(realPlot, 're', c.cyan, c.faintCyan, data);
+    drawProjection(imagPlot, 'im', c.orange, c.faintOrange, data);
+  }
+
+  function setFromPointer(event) {
+    const box = plane.getBoundingClientRect();
+    const size = Math.min(box.width, box.height), scale = size * .285;
+    const x = (event.clientX - box.left - box.width/2) / scale;
+    const y = -(event.clientY - box.top - box.height/2) / scale;
+    rInput.value = String(Math.min(1.5, Math.hypot(x,y)));
+    omegaInput.value = String(Math.atan2(y,x));
+    draw();
+  }
+  plane.addEventListener('pointerdown', e => { dragging=true; plane.setPointerCapture(e.pointerId); setFromPointer(e); });
+  plane.addEventListener('pointermove', e => { if(dragging) setFromPointer(e); });
+  plane.addEventListener('pointerup', () => dragging=false);
+  plane.addEventListener('pointercancel', () => dragging=false);
+  plane.addEventListener('keydown', e => {
+    if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) return;
+    e.preventDefault();
+    if(e.key==='ArrowUp') rInput.value=String(Math.min(1.5,Number(rInput.value)+.02));
+    if(e.key==='ArrowDown') rInput.value=String(Math.max(0,Number(rInput.value)-.02));
+    if(e.key==='ArrowRight') omegaInput.value=String(Math.min(Math.PI,Number(omegaInput.value)+.03));
+    if(e.key==='ArrowLeft') omegaInput.value=String(Math.max(-Math.PI,Number(omegaInput.value)-.03));
+    draw();
+  });
+  [rInput,omegaInput,fsInput].forEach(input => input.addEventListener('input',draw));
+  new ResizeObserver(draw).observe(root);
+  new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+</script>
+
+<style>
+  .z-playground { margin: 1.75rem 0; color: var(--sl-color-white); }
+  .z-header { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+  .z-header h2 { margin:.15rem 0 0; font-size:clamp(1.15rem,2vw,1.5rem); letter-spacing:-.025em; }
+  .eyebrow { color:var(--sl-color-accent-high); font-size:.7rem; font-weight:800; letter-spacing:.14em; }
+  .z-readout { flex:none; padding:.45rem .75rem; border:1px solid var(--sl-color-gray-5); border-radius:999px; background:var(--sl-color-gray-6); font-family:var(--sl-font-mono); font-size:.78rem; }
+  .z-layout { display:grid; grid-template-columns:minmax(17rem,.78fr) minmax(27rem,1.45fr); gap:1rem; align-items:start; }
+  .z-panel { min-width:0; padding:1rem; border:1px solid var(--sl-color-gray-5); border-radius:1rem; background:color-mix(in srgb,var(--sl-color-black) 94%,var(--sl-color-gray-6)); }
+  .panel-title { display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; min-height:2.8rem; }
+  .panel-title > div { display:flex; align-items:center; gap:.55rem; }
+  .panel-title h3 { margin:0; font-size:1rem; }
+  .panel-index { display:grid; place-items:center; width:1.7rem; height:1.7rem; border-radius:.45rem; background:var(--sl-color-accent-low); color:var(--sl-color-accent-high); font-family:var(--sl-font-mono); font-size:.67rem; font-weight:800; }
+  .hint,.signal-meta { color:var(--sl-color-gray-2); font-size:.72rem; text-align:right; }
+  canvas { display:block; width:100%; background:#091b34; border-radius:.65rem; touch-action:none; }
+  .z-plane { aspect-ratio:1; margin:.65rem 0 1rem; }
+  .z-plane:focus-visible { outline:3px solid var(--sl-color-accent); outline-offset:3px; }
+  .z-sliders { display:grid; gap:.8rem; }
+  .z-sliders label { display:grid; grid-template-columns:1fr auto; gap:.3rem .7rem; color:var(--sl-color-gray-2); font-size:.8rem; }
+  .z-sliders strong { color:var(--sl-color-white); font-family:var(--sl-font-mono); font-size:.75rem; }
+  .z-sliders input { grid-column:1/-1; width:100%; accent-color:var(--sl-color-accent); }
+  .plot-block { position:relative; }
+  .plot-label { display:block; margin:.35rem 0 .4rem; color:var(--sl-color-gray-2); font-size:.74rem; }
+  .plot-3d canvas { height:300px; }
+  .projection-grid { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; margin-top:.35rem; }
+  .projection-grid canvas { height:190px; }
+  @media (max-width:70rem) { .z-layout { grid-template-columns:1fr; } .z-controls-panel { display:grid; grid-template-columns:minmax(16rem,.7fr) minmax(15rem,1fr); gap:0 1rem; } .z-controls-panel .panel-title { grid-column:1/-1; } .z-plane { margin-bottom:0; } .z-sliders { align-content:center; } }
+  @media (max-width:42rem) { .z-header { align-items:flex-start; flex-direction:column; } .z-layout,.z-controls-panel,.projection-grid { grid-template-columns:1fr; } .plot-3d canvas { height:250px; } .projection-grid canvas { height:210px; } }
+</style>
