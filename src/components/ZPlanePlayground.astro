@@ -158,10 +158,45 @@ const id = `zplane-${Math.random().toString(36).slice(2)}`;
     const { r, omega } = state();
     const px = cx + r * Math.cos(omega) * scale;
     const py = cy - r * Math.sin(omega) * scale;
+
+    // Projections make the real and imaginary coordinates explicit.
+    ctx.strokeStyle = c.axis; ctx.lineWidth = 1; ctx.setLineDash([4, 5]);
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, cy); ctx.lineTo(cx, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(cx, py); ctx.lineTo(cx, cy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // The radial vector represents r = |z|.
     ctx.strokeStyle = c.faintCyan; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py); ctx.stroke();
-    ctx.strokeStyle = c.cyan; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(cx, cy, r * scale, -omega, 0, omega >= 0); ctx.stroke();
+    const vectorLabelX = cx + (px - cx) * .57;
+    const vectorLabelY = cy + (py - cy) * .57;
+    ctx.fillStyle = c.cyan; ctx.font = '600 12px system-ui'; ctx.textAlign = 'left';
+    ctx.fillText(`r = ${r.toFixed(2)}`, vectorLabelX + 7, vectorLabelY - 7);
+
+    // Canvas uses a downward y-axis, so a mathematical angle omega ends at -omega.
+    // Draw the short arc from the positive real axis to the vector direction.
+    const arcRadius = scale * .32;
+    const endAngle = -omega;
+    ctx.strokeStyle = c.orange; ctx.lineWidth = 2.2;
+    if (Math.abs(omega) > .015) {
+      ctx.beginPath(); ctx.arc(cx, cy, arcRadius, 0, endAngle, omega > 0); ctx.stroke();
+
+      const arrowX = cx + arcRadius * Math.cos(endAngle);
+      const arrowY = cy + arcRadius * Math.sin(endAngle);
+      const direction = omega > 0 ? -1 : 1;
+      const tangent = Math.atan2(direction * Math.cos(endAngle), direction * -Math.sin(endAngle));
+      ctx.fillStyle = c.orange;
+      ctx.beginPath();
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(arrowX - 9 * Math.cos(tangent - .45), arrowY - 9 * Math.sin(tangent - .45));
+      ctx.lineTo(arrowX - 9 * Math.cos(tangent + .45), arrowY - 9 * Math.sin(tangent + .45));
+      ctx.closePath(); ctx.fill();
+    }
+    const labelAngle = -omega / 2;
+    const labelRadius = arcRadius + 18;
+    ctx.fillStyle = c.orange; ctx.font = '600 12px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(`ω = ${(omega / Math.PI).toFixed(2)}π`, cx + labelRadius * Math.cos(labelAngle), cy + labelRadius * Math.sin(labelAngle));
+
     ctx.fillStyle = c.cyan; ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = c.bg; ctx.lineWidth = 3; ctx.stroke();
   }
