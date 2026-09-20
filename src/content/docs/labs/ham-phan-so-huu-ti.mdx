@@ -1,0 +1,45 @@
+---
+title: Lab — Hàm phân số hữu tỉ X(z)
+description: Đặt pole và zero trên mặt phẳng z, tự động tạo X(z) và quan sát bề mặt biên độ ba chiều.
+sidebar:
+  order: 3
+---
+
+import RationalZSurfaceLab from '../../../components/RationalZSurfaceLab.astro';
+
+## Mục tiêu
+
+Sau thí nghiệm này, bạn có thể:
+
+- tạo một hàm phân số hữu tỉ từ vị trí và bậc của các zero, pole;
+- nhận ra zero tạo “hố” và pole tạo “đỉnh” trên bề mặt biên độ;
+- liên hệ biểu diễn pole–zero, dạng tích nhân tử và các đa thức tử số, mẫu số.
+
+## Cơ sở lý thuyết
+
+Với hệ số khuếch đại $K=1$, hàm phân số hữu tỉ được viết dưới dạng
+
+$$
+X(z)=\frac{B(z)}{A(z)}
+=\frac{\prod_k (z-z_k)^{m_k}}{\prod_\ell (z-p_\ell)^{n_\ell}},
+$$
+
+trong đó $z_k$ là zero bậc $m_k$ và $p_\ell$ là pole bậc $n_\ell$. Trên bề mặt $20\log_{10}|X(z)|$, giá trị tiến xuống rất thấp gần zero và tăng rất cao gần pole. Lab giới hạn dải hiển thị để các cấu trúc này vẫn dễ quan sát.
+
+<RationalZSurfaceLab />
+
+## Hoạt động gợi ý
+
+1. Xóa cấu hình ban đầu, đặt một zero tại gốc và một pole tại $0.8$. So sánh hai vùng quanh chúng.
+2. Tăng pole tại $0.8$ từ bậc 1 lên bậc 2. Quan sát độ dốc của đỉnh thay đổi thế nào.
+3. Tạo một cặp pole liên hợp $0.7\pm j0.5$. Xoay bề mặt để kiểm tra tính đối xứng qua trục thực.
+
+:::tip[Điều khiển]
+Click vùng trống để mở menu thêm điểm; kéo trực tiếp zero hoặc pole để di chuyển. Nếu dùng bàn phím, nhập tọa độ trong biểu mẫu hoặc focus mặt phẳng rồi dùng phím mũi tên để di chuyển điểm cuối danh sách. Trên đồ thị 3D, kéo chuột/chạm hoặc dùng phím mũi tên để đổi góc nhìn.
+:::
+
+## Tự kiểm tra
+
+1. Vì sao pole bậc hai tạo đỉnh dốc hơn pole đơn?
+2. Điều kiện nào trên các hệ số của $A(z)$ và $B(z)$ khiến pole, zero phức xuất hiện thành từng cặp liên hợp?
+3. Nếu một pole và một zero trùng hoàn toàn vị trí và cùng bậc, bề mặt biên độ sẽ thay đổi ra sao?
