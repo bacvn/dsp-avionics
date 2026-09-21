@@ -11,6 +11,7 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
     <div class="legend" aria-label="Chú giải">
       <span><i class="zero-mark"></i> Zero</span>
       <span><i class="pole-mark">×</i> Pole</span>
+      <span><i class="unit-mark"></i> |z| = 1</span>
     </div>
   </header>
 
@@ -65,7 +66,25 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
     <section class="rz-panel surface-panel" aria-labelledby={`${id}-surface-title`}>
       <div class="panel-title surface-title-row">
         <div><span class="panel-index">02</span><h3 id={`${id}-surface-title`}>Bề mặt biên độ của X(z)</h3></div>
-        <button type="button" data-reset-view>Đặt lại góc nhìn</button>
+        <div class="surface-actions">
+          <output data-view-state aria-live="polite">Góc mặc định</output>
+          <button type="button" data-reset-view>Đặt lại góc nhìn</button>
+        </div>
+      </div>
+
+      <div class="lab-options">
+        <label>Loại hệ
+          <select data-system-type>
+            <option value="real">Hệ thực — tự thêm liên hợp</option>
+            <option value="complex">Hệ phức — điểm tự do</option>
+          </select>
+        </label>
+        <div class="resolution-control">
+          <span>Độ phân giải 3D</span>
+          <button type="button" data-resolution-down aria-label="Giảm độ phân giải">−</button>
+          <output data-resolution aria-live="polite">35 × 35</output>
+          <button type="button" data-resolution-up aria-label="Tăng độ phân giải">+</button>
+        </div>
       </div>
 
       <div class="surface-wrap">
@@ -90,16 +109,21 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
   const pointMenu = root.querySelector('[data-point-menu]');
   const pointList = root.querySelector('[data-point-list]');
   const domain = 1.6;
+  const defaultYaw = -0.72;
+  const defaultPitch = 0.83;
   let points = [
-    { id: 1, type: 'zero', re: -0.55, im: 0, order: 1 },
-    { id: 2, type: 'pole', re: 0.68, im: 0.48, order: 1 },
-    { id: 3, type: 'pole', re: 0.68, im: -0.48, order: 1 },
+    { id: 1, group: 1, type: 'zero', re: -0.55, im: 0, order: 1 },
+    { id: 2, group: 2, type: 'pole', re: 0.68, im: 0.48, order: 1 },
+    { id: 3, group: 2, type: 'pole', re: 0.68, im: -0.48, order: 1 },
   ];
   let nextId = 4;
+  let nextGroup = 3;
+  let realSystem = true;
+  let resolution = 35;
   let pending = null;
   let draggedId = null;
-  let yaw = -0.72;
-  let pitch = 0.83;
+  let yaw = defaultYaw;
+  let pitch = defaultPitch;
   let surfaceDrag = null;
 
   const css = (name, fallback) => getComputedStyle(root).getPropertyValue(name).trim() || fallback;
@@ -113,6 +137,34 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
   };
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const clean = (v) => Math.abs(v) < 0.005 ? 0 : Math.round(v * 100) / 100;
+  const mateOf = (p) => points.find((q) => q.id !== p.id && q.group === p.group);
+  function syncPair(p) {
+    if (!realSystem) return;
+    const mate = mateOf(p);
+    if (Math.abs(p.im) < 0.005) {
+      p.im = 0;
+      if (mate) points = points.filter((q) => q.id !== mate.id);
+      return;
+    }
+    if (mate) Object.assign(mate, { type:p.type, re:p.re, im:-p.im, order:p.order });
+    else points.push({ id:nextId++, group:p.group, type:p.type, re:p.re, im:-p.im, order:p.order });
+  }
+  function addPoint(type, re, im, order) {
+    const p = { id:nextId++, group:nextGroup++, type, re:clean(clamp(re,-domain,domain)), im:clean(clamp(im,-domain,domain)), order:clamp(Math.round(order),1,9) };
+    points.push(p); syncPair(p);
+  }
+  function enforceRealSystem() {
+    const originals = [...points];
+    const used = new Set();
+    for (const p of originals) {
+      if (used.has(p.id)) continue;
+      if (Math.abs(p.im) < .005) { p.im=0; p.group=nextGroup++; used.add(p.id); continue; }
+      const mate = originals.find((q) => !used.has(q.id) && q.id!==p.id && q.type===p.type && q.order===p.order && Math.abs(q.re-p.re)<.005 && Math.abs(q.im+p.im)<.005);
+      p.group=nextGroup++; used.add(p.id);
+      if (mate) { mate.group=p.group; used.add(mate.id); }
+      else points.push({id:nextId++,group:p.group,type:p.type,re:p.re,im:-p.im,order:p.order});
+    }
+  }
   const planeCoord = (event) => {
     const rect = plane.getBoundingClientRect();
     const side = Math.min(rect.width, rect.height);
@@ -151,6 +203,8 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
     ctx.beginPath(); ctx.moveTo(ox,oy-domain*scale); ctx.lineTo(ox,oy+domain*scale); ctx.stroke();
     ctx.setLineDash([7*dpr,6*dpr]); ctx.strokeStyle=accent; ctx.globalAlpha=.65; ctx.lineWidth=1.5*dpr;
     ctx.beginPath(); ctx.arc(ox,oy,scale,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.globalAlpha=.92; ctx.fillStyle=accent; ctx.font=`600 ${12*dpr}px system-ui`; ctx.textAlign='left';
+    ctx.fillText('Đường tròn đơn vị  |z| = 1',ox+scale*.42,oy-scale*.86);
     ctx.globalAlpha=.8; ctx.fillStyle=fg; ctx.font=`${12*dpr}px system-ui`; ctx.textAlign='center'; ctx.fillText('−1',ox-scale,oy+18*dpr); ctx.fillText('1',ox+scale,oy+18*dpr);
     ctx.textAlign='left'; ctx.fillText('Re{z}',ox+domain*scale-35*dpr,oy-9*dpr); ctx.fillText('Im{z}',ox+8*dpr,oy-domain*scale+14*dpr);
     points.forEach((p) => {
@@ -179,7 +233,7 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
   function drawSurface() {
     const {ctx,width,height,dpr}=fitCanvas(surface), bg=css('--sl-color-bg','#0b111c'), fg=css('--sl-color-text','#e7edf7'), grid=css('--sl-color-gray-5','#526076');
     ctx.clearRect(0,0,width,height); ctx.fillStyle=bg; ctx.fillRect(0,0,width,height);
-    const n=35, cells=[];
+    const n=resolution, cells=[];
     for(let j=0;j<n-1;j++) for(let i=0;i<n-1;i++) {
       const verts=[]; let avg=0;
       for(const [ii,jj] of [[i,j],[i+1,j],[i+1,j+1],[i,j+1]]) {
@@ -200,33 +254,37 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
   const polyFrom=(roots)=>{ let a=[{re:1,im:0}]; for(const p of roots) for(let k=0;k<p.order;k++){const b=Array(a.length+1).fill(0).map(()=>({re:0,im:0}));a.forEach((c,i)=>{b[i].re+=c.re;b[i].im+=c.im;b[i+1].re-=c.re*p.re-c.im*p.im;b[i+1].im-=c.re*p.im+c.im*p.re;});a=b;} return a; };
   const polyText=(name,a)=>`${name}(z) = `+a.map((c,i)=>{const pow=a.length-1-i, coeff=formatComplex(c.re,c.im);return `${i?' + ':''}(${coeff})${pow?`z${pow>1?'^'+pow:''}`:''}`;}).join('').replaceAll('+ (−','− (');
   function renderEquation(){const zeros=points.filter(p=>p.type==='zero'),poles=points.filter(p=>p.type==='pole');root.querySelector('[data-numerator]').textContent=zeros.length?zeros.map(factor).join(' '):'1';root.querySelector('[data-denominator]').textContent=poles.length?poles.map(factor).join(' '):'1';root.querySelector('[data-b-poly]').textContent=polyText('B',polyFrom(zeros));root.querySelector('[data-a-poly]').textContent=polyText('A',polyFrom(poles));}
-  function renderList(){ pointList.replaceChildren(); if(!points.length){const e=document.createElement('p');e.className='empty';e.textContent='Chưa có điểm. Click lên mặt phẳng hoặc nhập tọa độ ở trên.';pointList.append(e);return;} points.forEach((p,index)=>{const row=document.createElement('div');row.className=`point-row ${p.type}`;row.innerHTML=`<span class="point-symbol" aria-hidden="true">${p.type==='zero'?'○':'×'}</span><strong>${p.type==='zero'?'Zero':'Pole'} ${index+1}</strong><label>Re <input type="number" step="0.01" min="-${domain}" max="${domain}" value="${p.re}"></label><label>Im <input type="number" step="0.01" min="-${domain}" max="${domain}" value="${p.im}"></label><label>Bậc <input type="number" step="1" min="1" max="9" value="${p.order}"></label><button type="button" aria-label="Xóa ${p.type} ${index+1}">Xóa</button>`;const inputs=row.querySelectorAll('input');inputs.forEach((input,i)=>input.addEventListener('change',()=>{const v=Number(input.value);if(!Number.isFinite(v))return;if(i===0)p.re=clamp(v,-domain,domain);if(i===1)p.im=clamp(v,-domain,domain);if(i===2)p.order=clamp(Math.round(v),1,9);update(false);}));row.querySelector('button').addEventListener('click',()=>{points=points.filter(q=>q.id!==p.id);update();});pointList.append(row);});}
+  function renderList(){ pointList.replaceChildren(); if(!points.length){const e=document.createElement('p');e.className='empty';e.textContent='Chưa có điểm. Click lên mặt phẳng hoặc nhập tọa độ ở trên.';pointList.append(e);return;} points.forEach((p,index)=>{const row=document.createElement('div');row.className=`point-row ${p.type}`;const paired=realSystem&&Math.abs(p.im)>.005;row.innerHTML=`<span class="point-symbol" aria-hidden="true">${p.type==='zero'?'○':'×'}</span><strong>${p.type==='zero'?'Zero':'Pole'} ${index+1}${paired?' ↔':''}</strong><label>Re <input type="number" step="0.01" min="-${domain}" max="${domain}" value="${p.re}"></label><label>Im <input type="number" step="0.01" min="-${domain}" max="${domain}" value="${p.im}"></label><label>Bậc <input type="number" step="1" min="1" max="9" value="${p.order}"></label><button type="button" aria-label="Xóa ${p.type} ${index+1}${paired?' và điểm liên hợp':''}">Xóa</button>`;const inputs=row.querySelectorAll('input');inputs.forEach((input,i)=>input.addEventListener('change',()=>{const v=Number(input.value);if(!Number.isFinite(v))return;if(i===0)p.re=clean(clamp(v,-domain,domain));if(i===1)p.im=clean(clamp(v,-domain,domain));if(i===2)p.order=clamp(Math.round(v),1,9);syncPair(p);update();}));row.querySelector('button').addEventListener('click',()=>{points=points.filter(q=>q.id!==p.id&&(!realSystem||q.group!==p.group));update();});pointList.append(row);});}
   function update(list=true){drawPlane();drawSurface();renderEquation();if(list)renderList();}
 
   plane.addEventListener('pointerdown',(event)=>{const hit=eventPointHit(event);if(hit){draggedId=hit.id;plane.setPointerCapture(event.pointerId);pointMenu.hidden=true;}else{pending=planeCoord(event);const wrap=root.querySelector('.plane-wrap').getBoundingClientRect();pointMenu.style.left=`${clamp(event.clientX-wrap.left+12,8,wrap.width-190)}px`;pointMenu.style.top=`${clamp(event.clientY-wrap.top+12,8,wrap.height-190)}px`;root.querySelector('[data-menu-coordinate]').textContent=`${formatComplex(pending.re,pending.im)}`;pointMenu.hidden=false;root.querySelector('[data-menu-type]').focus();}});
-  plane.addEventListener('pointermove',(event)=>{if(draggedId===null)return;const p=points.find(q=>q.id===draggedId);if(p){const q=planeCoord(event);p.re=q.re;p.im=q.im;update(false);}});
+  plane.addEventListener('pointermove',(event)=>{if(draggedId===null)return;const p=points.find(q=>q.id===draggedId);if(p){const q=planeCoord(event);p.re=q.re;p.im=q.im;syncPair(p);update(false);}});
   plane.addEventListener('pointerup',()=>{if(draggedId!==null){draggedId=null;renderList();renderEquation();}});
-  plane.addEventListener('keydown',(event)=>{if(!points.length)return;const p=points[points.length-1],step=event.shiftKey?.1:.02;if(event.key==='ArrowLeft')p.re=clamp(p.re-step,-domain,domain);else if(event.key==='ArrowRight')p.re=clamp(p.re+step,-domain,domain);else if(event.key==='ArrowUp')p.im=clamp(p.im+step,-domain,domain);else if(event.key==='ArrowDown')p.im=clamp(p.im-step,-domain,domain);else return;event.preventDefault();update();});
-  pointMenu.addEventListener('submit',(event)=>{event.preventDefault();if(!pending)return;points.push({id:nextId++,type:root.querySelector('[data-menu-type]').value,re:pending.re,im:pending.im,order:Number(root.querySelector('[data-menu-order]').value)});pointMenu.hidden=true;update();});
+  plane.addEventListener('keydown',(event)=>{if(!points.length)return;const p=points[points.length-1],step=event.shiftKey?.1:.02;if(event.key==='ArrowLeft')p.re=clamp(p.re-step,-domain,domain);else if(event.key==='ArrowRight')p.re=clamp(p.re+step,-domain,domain);else if(event.key==='ArrowUp')p.im=clamp(p.im+step,-domain,domain);else if(event.key==='ArrowDown')p.im=clamp(p.im-step,-domain,domain);else return;event.preventDefault();syncPair(p);update();});
+  pointMenu.addEventListener('submit',(event)=>{event.preventDefault();if(!pending)return;addPoint(root.querySelector('[data-menu-type]').value,pending.re,pending.im,Number(root.querySelector('[data-menu-order]').value));pointMenu.hidden=true;update();});
   root.querySelector('[data-menu-cancel]').addEventListener('click',()=>pointMenu.hidden=true);
-  root.querySelector('[data-manual-form]').addEventListener('submit',(event)=>{event.preventDefault();const re=Number(root.querySelector('[data-manual-re]').value),im=Number(root.querySelector('[data-manual-im]').value),order=Number(root.querySelector('[data-manual-order]').value);if(!Number.isFinite(re)||!Number.isFinite(im)||!Number.isFinite(order))return;points.push({id:nextId++,type:root.querySelector('[data-manual-type]').value,re:clamp(re,-domain,domain),im:clamp(im,-domain,domain),order:clamp(Math.round(order),1,9)});update();});
+  root.querySelector('[data-manual-form]').addEventListener('submit',(event)=>{event.preventDefault();const re=Number(root.querySelector('[data-manual-re]').value),im=Number(root.querySelector('[data-manual-im]').value),order=Number(root.querySelector('[data-manual-order]').value);if(!Number.isFinite(re)||!Number.isFinite(im)||!Number.isFinite(order))return;addPoint(root.querySelector('[data-manual-type]').value,re,im,order);update();});
   root.querySelector('[data-clear]').addEventListener('click',()=>{points=[];update();});
   surface.addEventListener('pointerdown',(e)=>{surfaceDrag={x:e.clientX,y:e.clientY};surface.setPointerCapture(e.pointerId);});
-  surface.addEventListener('pointermove',(e)=>{if(!surfaceDrag)return;yaw+=(e.clientX-surfaceDrag.x)*.008;pitch=clamp(pitch+(e.clientY-surfaceDrag.y)*.008,.2,1.35);surfaceDrag={x:e.clientX,y:e.clientY};drawSurface();});
+  surface.addEventListener('pointermove',(e)=>{if(!surfaceDrag)return;yaw+=(e.clientX-surfaceDrag.x)*.008;pitch=clamp(pitch+(e.clientY-surfaceDrag.y)*.008,.2,1.35);surfaceDrag={x:e.clientX,y:e.clientY};root.querySelector('[data-view-state]').textContent='Đã xoay';drawSurface();});
   surface.addEventListener('pointerup',()=>surfaceDrag=null);
-  surface.addEventListener('keydown',(e)=>{if(e.key==='ArrowLeft')yaw-=.08;else if(e.key==='ArrowRight')yaw+=.08;else if(e.key==='ArrowUp')pitch=clamp(pitch-.08,.2,1.35);else if(e.key==='ArrowDown')pitch=clamp(pitch+.08,.2,1.35);else return;e.preventDefault();drawSurface();});
-  root.querySelector('[data-reset-view]').addEventListener('click',()=>{yaw=-.72;pitch=.83;drawSurface();surface.focus();});
+  surface.addEventListener('keydown',(e)=>{if(e.key==='ArrowLeft')yaw-=.08;else if(e.key==='ArrowRight')yaw+=.08;else if(e.key==='ArrowUp')pitch=clamp(pitch-.08,.2,1.35);else if(e.key==='ArrowDown')pitch=clamp(pitch+.08,.2,1.35);else return;e.preventDefault();root.querySelector('[data-view-state]').textContent='Đã xoay';drawSurface();});
+  root.querySelector('[data-reset-view]').addEventListener('click',()=>{surfaceDrag=null;yaw=defaultYaw;pitch=defaultPitch;root.querySelector('[data-view-state]').textContent='Góc mặc định';drawSurface();});
+  root.querySelector('[data-system-type]').addEventListener('change',(event)=>{realSystem=event.target.value==='real';if(realSystem)enforceRealSystem();update();});
+  const setResolution=(value)=>{resolution=clamp(value,19,67);root.querySelector('[data-resolution]').textContent=`${resolution} × ${resolution}`;root.querySelector('[data-resolution-down]').disabled=resolution<=19;root.querySelector('[data-resolution-up]').disabled=resolution>=67;drawSurface();};
+  root.querySelector('[data-resolution-down]').addEventListener('click',()=>setResolution(resolution-8));
+  root.querySelector('[data-resolution-up]').addEventListener('click',()=>setResolution(resolution+8));
   new ResizeObserver(()=>update(false)).observe(root);
   update();
 </script>
 
 <style>
-  .rz-lab{margin:2rem calc(50% - 48vw);width:96vw;color:var(--sl-color-text)}
+  .rz-lab{margin:2rem 0;width:100%;max-width:100%;color:var(--sl-color-text);overflow:hidden}
   .rz-header,.panel-title,.point-list-heading,.surface-title-row,.form-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem}
   .rz-header{margin-bottom:1rem}.rz-header h2{margin:.25rem 0 0;font-size:clamp(1.3rem,2vw,2rem)}
   .eyebrow,.panel-index{color:var(--sl-color-accent-high);font-size:.72rem;font-weight:700;letter-spacing:.14em}
-  .legend{display:flex;gap:1rem;white-space:nowrap}.legend span{display:flex;align-items:center;gap:.35rem}.zero-mark{width:14px;height:14px;border:2px solid var(--sl-color-accent-high);border-radius:50%}.pole-mark{color:var(--sl-color-orange-high);font-size:1.5rem;line-height:1}
-  .rz-layout{display:grid;grid-template-columns:minmax(330px,.82fr) minmax(520px,1.35fr);gap:1rem}
+  .legend{display:flex;gap:1rem;white-space:nowrap}.legend span{display:flex;align-items:center;gap:.35rem}.zero-mark{width:14px;height:14px;border:2px solid var(--sl-color-accent-high);border-radius:50%}.pole-mark{color:var(--sl-color-orange-high);font-size:1.5rem;line-height:1}.unit-mark{width:22px;border-top:2px dashed var(--sl-color-accent-high)}
+  .rz-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}
   .rz-panel{min-width:0;border:1px solid var(--sl-color-gray-5);border-radius:14px;background:color-mix(in srgb,var(--sl-color-bg) 94%,var(--sl-color-gray-6));padding:1rem}
   .panel-title h3{display:inline;margin:0 0 0 .55rem;font-size:1.05rem}.hint,.surface-note,.form-heading span{color:var(--sl-color-gray-2);font-size:.82rem}
   .plane-wrap,.surface-wrap{position:relative;margin-top:.8rem;overflow:hidden;border-radius:10px;background:var(--sl-color-bg)}
@@ -236,7 +294,7 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
   .manual-form{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--sl-color-gray-5)}.manual-grid{display:grid;grid-template-columns:1.1fr .85fr .85fr .75fr auto;gap:.5rem;align-items:end;margin-top:.55rem}.manual-grid label,.point-row label{font-size:.75rem;color:var(--sl-color-gray-2)}.manual-grid button{height:2.2rem}
   .point-list-heading{margin-top:1rem}.point-list{display:grid;gap:.45rem;margin-top:.55rem}.point-row{display:grid;grid-template-columns:24px 76px repeat(3,1fr) auto;gap:.45rem;align-items:end;padding:.45rem;background:color-mix(in srgb,var(--sl-color-bg) 80%,var(--sl-color-gray-6));border-radius:8px}.point-row strong{align-self:center;font-size:.8rem}.point-symbol{align-self:center;text-align:center;font-size:1.45rem;font-weight:700}.point-row.zero .point-symbol{color:var(--sl-color-accent-high)}.point-row.pole .point-symbol{color:var(--sl-color-orange-high)}.empty{margin:.5rem 0;color:var(--sl-color-gray-2);font-size:.85rem}
   .rotate-hint{position:absolute;left:50%;bottom:.7rem;transform:translateX(-50%);padding:.32rem .6rem;border-radius:999px;color:var(--sl-color-gray-1);background:color-mix(in srgb,var(--sl-color-bg) 80%,transparent);font-size:.76rem;white-space:nowrap;pointer-events:none}.color-scale{display:flex;align-items:center;gap:.6rem;margin:.55rem .2rem;color:var(--sl-color-gray-2);font-size:.72rem}.color-scale i{height:8px;flex:1;border-radius:999px;background:linear-gradient(90deg,#2c76a6,#39cdb7,#f57e42)}
+  .surface-actions,.lab-options,.resolution-control{display:flex;align-items:center;gap:.55rem}.surface-actions output{color:var(--sl-color-gray-2);font-size:.76rem}.lab-options{justify-content:space-between;flex-wrap:wrap;margin-top:.8rem;padding:.65rem 0;border-top:1px solid var(--sl-color-gray-5);border-bottom:1px solid var(--sl-color-gray-5)}.lab-options label{display:flex;align-items:center;gap:.55rem;font-size:.82rem}.lab-options select{max-width:240px;padding:.38rem .5rem;color:var(--sl-color-text);background:var(--sl-color-bg);border:1px solid var(--sl-color-gray-4);border-radius:6px}.resolution-control span{font-size:.82rem}.resolution-control output{min-width:58px;text-align:center;font: .8rem ui-monospace,monospace}.resolution-control button{min-width:2rem}.resolution-control button:disabled{opacity:.45;cursor:not-allowed}
   .equation{margin-top:.8rem;padding:1rem;border-left:3px solid var(--sl-color-accent-high);background:color-mix(in srgb,var(--sl-color-bg) 82%,var(--sl-color-gray-6))}.factor-form{display:flex;align-items:center;gap:.65rem;font-family:ui-monospace,monospace;font-size:1rem}.fraction{display:inline-grid;text-align:center}.fraction span{padding:.28rem .5rem}.fraction span:first-child{border-bottom:1px solid currentColor}.polynomials{display:grid;gap:.25rem;margin-top:.75rem;color:var(--sl-color-gray-2);font: .78rem ui-monospace,monospace;overflow-wrap:anywhere}.surface-note{margin:.7rem 0 0}
-  @media(max-width:1400px){.rz-lab{margin:2rem 0;width:100%}.rz-layout{grid-template-columns:1fr}.surface-wrap canvas{height:520px}}
-  @media(max-width:600px){.rz-header{align-items:flex-start;flex-direction:column}.hint{display:none}.rz-panel{padding:.7rem}.manual-grid{grid-template-columns:repeat(2,1fr)}.manual-grid button{grid-column:1/-1}.point-row{grid-template-columns:24px 1fr 1fr}.point-row strong{grid-column:2/-1}.point-row button{grid-column:3}.surface-wrap canvas{height:430px}.rotate-hint{font-size:.68rem}.factor-form{font-size:.8rem;overflow-x:auto}}
+  @media(max-width:600px){.rz-header{align-items:flex-start;flex-direction:column}.legend{flex-wrap:wrap}.hint{display:none}.rz-panel{padding:.7rem}.manual-grid{grid-template-columns:repeat(2,1fr)}.manual-grid button{grid-column:1/-1}.point-row{grid-template-columns:24px 1fr 1fr}.point-row strong{grid-column:2/-1}.point-row button{grid-column:3}.surface-title-row{align-items:flex-start}.surface-actions{align-items:flex-end;flex-direction:column}.lab-options{align-items:stretch;flex-direction:column}.resolution-control{justify-content:space-between}.surface-wrap canvas{height:430px}.rotate-hint{font-size:.68rem}.factor-form{font-size:.8rem;overflow-x:auto}}
 </style>
