@@ -58,9 +58,25 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
 
       <div class="point-list-heading">
         <strong>Danh sách điểm</strong>
-        <button type="button" data-clear>Xóa tất cả</button>
+        <div class="list-actions">
+          <button type="button" data-clear-zeros>Xóa mọi zero</button>
+          <button type="button" data-clear>Xóa tất cả</button>
+        </div>
       </div>
       <div class="point-list" data-point-list aria-live="polite"></div>
+
+      <div class="mode-presets">
+        <strong>Preset khảo sát mode của pole</strong>
+        <p>Mỗi preset xóa zero để chỉ giữ ảnh hưởng tự nhiên của pole.</p>
+        <div class="preset-grid">
+          <button type="button" data-preset="positive">Thực dương · tắt dần</button>
+          <button type="button" data-preset="negative">Thực âm · đổi dấu</button>
+          <button type="button" data-preset="complex">Phức · dao động</button>
+          <button type="button" data-preset="unit">Trên |z| = 1</button>
+          <button type="button" data-preset="outside">Ngoài |z| = 1</button>
+          <button type="button" data-preset="repeated">Cực bội</button>
+        </div>
+      </div>
     </section>
 
     <section class="rz-panel surface-panel" aria-labelledby={`${id}-surface-title`}>
@@ -99,6 +115,21 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
       </div>
       <p class="surface-note">Bề mặt biểu diễn <strong>20 log₁₀|X(z)|</strong>, giới hạn trong khoảng −36 đến +36 dB để zero và pole vẫn quan sát được.</p>
     </section>
+
+    <section class="rz-panel impulse-panel" aria-labelledby={`${id}-impulse-title`}>
+      <div class="panel-title impulse-title-row">
+        <div><span class="panel-index">03</span><h3 id={`${id}-impulse-title`}>Đáp ứng xung h[n] — stem plot</h3></div>
+        <label class="sample-control">Số mẫu
+          <input data-sample-count type="number" min="12" max="96" step="4" value="40" />
+        </label>
+      </div>
+      <div class="mode-summary" data-mode-summary aria-live="polite"></div>
+      <div class="stem-wrap">
+        <canvas data-stem width="1120" height="520" tabindex="0" role="img" aria-label="Stem plot của đáp ứng hệ thống khi đầu vào là xung đơn vị."></canvas>
+      </div>
+      <div class="stem-legend" aria-hidden="true"><span><i class="real-sample"></i> Re&#123;h[n]&#125;</span><span><i class="imag-sample"></i> Im&#123;h[n]&#125;</span></div>
+      <p class="surface-note">Giả thiết hệ <strong>nhân quả</strong>, ROC nằm ngoài pole có bán kính lớn nhất. Đồ thị dùng H(z) ở dạng lũy thừa z⁻¹ và đầu vào là xung đơn vị δ[n].</p>
+    </section>
   </div>
 </section>
 
@@ -106,6 +137,7 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
   const root = document.getElementById(id);
   const plane = root.querySelector('[data-plane]');
   const surface = root.querySelector('[data-surface]');
+  const stem = root.querySelector('[data-stem]');
   const pointMenu = root.querySelector('[data-point-menu]');
   const pointList = root.querySelector('[data-point-list]');
   const domain = 1.6;
@@ -125,6 +157,7 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
   let yaw = defaultYaw;
   let pitch = defaultPitch;
   let surfaceDrag = null;
+  let sampleCount = 40;
 
   const css = (name, fallback) => getComputedStyle(root).getPropertyValue(name).trim() || fallback;
   const fitCanvas = (canvas) => {
@@ -255,7 +288,54 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
   const polyText=(name,a)=>`${name}(z) = `+a.map((c,i)=>{const pow=a.length-1-i, coeff=formatComplex(c.re,c.im);return `${i?' + ':''}(${coeff})${pow?`z${pow>1?'^'+pow:''}`:''}`;}).join('').replaceAll('+ (−','− (');
   function renderEquation(){const zeros=points.filter(p=>p.type==='zero'),poles=points.filter(p=>p.type==='pole');root.querySelector('[data-numerator]').textContent=zeros.length?zeros.map(factor).join(' '):'1';root.querySelector('[data-denominator]').textContent=poles.length?poles.map(factor).join(' '):'1';root.querySelector('[data-b-poly]').textContent=polyText('B',polyFrom(zeros));root.querySelector('[data-a-poly]').textContent=polyText('A',polyFrom(poles));}
   function renderList(){ pointList.replaceChildren(); if(!points.length){const e=document.createElement('p');e.className='empty';e.textContent='Chưa có điểm. Click lên mặt phẳng hoặc nhập tọa độ ở trên.';pointList.append(e);return;} points.forEach((p,index)=>{const row=document.createElement('div');row.className=`point-row ${p.type}`;const paired=realSystem&&Math.abs(p.im)>.005;row.innerHTML=`<span class="point-symbol" aria-hidden="true">${p.type==='zero'?'○':'×'}</span><strong>${p.type==='zero'?'Zero':'Pole'} ${index+1}${paired?' ↔':''}</strong><label>Re <input type="number" step="0.01" min="-${domain}" max="${domain}" value="${p.re}"></label><label>Im <input type="number" step="0.01" min="-${domain}" max="${domain}" value="${p.im}"></label><label>Bậc <input type="number" step="1" min="1" max="9" value="${p.order}"></label><button type="button" aria-label="Xóa ${p.type} ${index+1}${paired?' và điểm liên hợp':''}">Xóa</button>`;const inputs=row.querySelectorAll('input');inputs.forEach((input,i)=>input.addEventListener('change',()=>{const v=Number(input.value);if(!Number.isFinite(v))return;if(i===0)p.re=clean(clamp(v,-domain,domain));if(i===1)p.im=clean(clamp(v,-domain,domain));if(i===2)p.order=clamp(Math.round(v),1,9);syncPair(p);update();}));row.querySelector('button').addEventListener('click',()=>{points=points.filter(q=>q.id!==p.id&&(!realSystem||q.group!==p.group));update();});pointList.append(row);});}
-  function update(list=true){drawPlane();drawSurface();renderEquation();if(list)renderList();}
+  const cAdd=(a,b)=>({re:a.re+b.re,im:a.im+b.im});
+  const cMul=(a,b)=>({re:a.re*b.re-a.im*b.im,im:a.re*b.im+a.im*b.re});
+  const impulseResponse=()=>{
+    const b=polyFrom(points.filter(p=>p.type==='zero'));
+    const a=polyFrom(points.filter(p=>p.type==='pole'));
+    const h=[];
+    for(let n=0;n<sampleCount;n++){
+      let value=n<b.length?{...b[n]}:{re:0,im:0};
+      for(let k=1;k<a.length&&k<=n;k++){
+        const feedback=cMul(a[k],h[n-k]);
+        value=cAdd(value,{re:-feedback.re,im:-feedback.im});
+      }
+      h.push(value);
+    }
+    return h;
+  };
+  function describeMode(){
+    const poles=points.filter(p=>p.type==='pole');
+    if(!poles.length)return '<strong>FIR:</strong> không có pole hữu hạn; đáp ứng chỉ do các zero quyết định.';
+    const maxRadius=Math.max(...poles.map(p=>Math.hypot(p.re,p.im)));
+    const stability=maxRadius<.995?'ổn định — biên độ tắt dần':maxRadius<=1.005?'biên giới ổn định — mode không tắt':'không ổn định — biên độ tăng';
+    const features=[];
+    if(poles.some(p=>Math.abs(p.im)>.005))features.push('pole phức tạo dao động');
+    if(poles.some(p=>Math.abs(p.im)<=.005&&p.re<0))features.push('pole thực âm làm mẫu đổi dấu');
+    if(poles.some(p=>p.order>1))features.push('cực bội sinh thêm thừa số đa thức theo n');
+    if(!features.length)features.push('pole thực dương tạo exponential không đổi dấu');
+    return `<strong>${stability}</strong> · r<sub>max</sub> = ${maxRadius.toFixed(3)} · ${features.join(' · ')}`;
+  }
+  function drawStem(){
+    const {ctx,width,height,dpr}=fitCanvas(stem), bg=css('--sl-color-bg','#0b111c'), fg=css('--sl-color-text','#e7edf7'), grid=css('--sl-color-gray-5','#526076');
+    const realColor=css('--sl-color-accent-high','#54d2d2'), imagColor=css('--sl-color-orange-high','#ff9d55');
+    const h=impulseResponse(), padL=54*dpr,padR=18*dpr,padT=22*dpr,padB=42*dpr,plotW=width-padL-padR,plotH=height-padT-padB;
+    let peak=Math.max(1e-9,...h.flatMap(v=>[Math.abs(v.re),Math.abs(v.im)]));
+    const clipped=peak>1e4; peak=Math.min(peak,1e4);
+    const yMax=peak*1.12, xAt=n=>padL+(h.length===1?0:n/(h.length-1))*plotW, yAt=v=>padT+plotH/2-v/yMax*plotH/2;
+    ctx.clearRect(0,0,width,height);ctx.fillStyle=bg;ctx.fillRect(0,0,width,height);
+    ctx.strokeStyle=grid;ctx.globalAlpha=.42;ctx.lineWidth=dpr;
+    for(let t=-1;t<=1;t+=.5){const y=yAt(t*yMax);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(width-padR,y);ctx.stroke();}
+    ctx.globalAlpha=.9;ctx.strokeStyle=fg;ctx.beginPath();ctx.moveTo(padL,yAt(0));ctx.lineTo(width-padR,yAt(0));ctx.stroke();
+    const drawSeries=(key,color,offset)=>{ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=1.6*dpr;h.forEach((v,n)=>{const raw=v[key],value=clamp(raw,-1e4,1e4),x=xAt(n)+offset*dpr,y=yAt(value);ctx.beginPath();ctx.moveTo(x,yAt(0));ctx.lineTo(x,y);ctx.stroke();ctx.beginPath();ctx.arc(x,y,3.6*dpr,0,Math.PI*2);ctx.fill();});};
+    drawSeries('re',realColor,-2);if(h.some(v=>Math.abs(v.im)>1e-7))drawSeries('im',imagColor,2);
+    ctx.fillStyle=fg;ctx.globalAlpha=.8;ctx.font=`${11*dpr}px system-ui`;ctx.textAlign='center';
+    const tickStep=h.length>60?10:h.length>32?5:2;for(let n=0;n<h.length;n+=tickStep)ctx.fillText(String(n),xAt(n),height-15*dpr);
+    ctx.textAlign='left';ctx.fillText(`±${yMax.toPrecision(3)}`,5*dpr,padT+10*dpr);ctx.textAlign='right';ctx.fillText('n',width-padR,height-15*dpr);
+    if(clipped){ctx.fillStyle=imagColor;ctx.textAlign='right';ctx.fillText('Biên độ đã cắt tại 10⁴ để còn quan sát được',width-padR,padT+10*dpr);}
+    root.querySelector('[data-mode-summary]').innerHTML=describeMode();
+  }
+  function update(list=true){drawPlane();drawSurface();drawStem();renderEquation();if(list)renderList();}
 
   plane.addEventListener('pointerdown',(event)=>{const hit=eventPointHit(event);if(hit){draggedId=hit.id;plane.setPointerCapture(event.pointerId);pointMenu.hidden=true;}else{pending=planeCoord(event);const wrap=root.querySelector('.plane-wrap').getBoundingClientRect();pointMenu.style.left=`${clamp(event.clientX-wrap.left+12,8,wrap.width-190)}px`;pointMenu.style.top=`${clamp(event.clientY-wrap.top+12,8,wrap.height-190)}px`;root.querySelector('[data-menu-coordinate]').textContent=`${formatComplex(pending.re,pending.im)}`;pointMenu.hidden=false;root.querySelector('[data-menu-type]').focus();}});
   plane.addEventListener('pointermove',(event)=>{if(draggedId===null)return;const p=points.find(q=>q.id===draggedId);if(p){const q=planeCoord(event);p.re=q.re;p.im=q.im;syncPair(p);update(false);}});
@@ -265,6 +345,21 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
   root.querySelector('[data-menu-cancel]').addEventListener('click',()=>pointMenu.hidden=true);
   root.querySelector('[data-manual-form]').addEventListener('submit',(event)=>{event.preventDefault();const re=Number(root.querySelector('[data-manual-re]').value),im=Number(root.querySelector('[data-manual-im]').value),order=Number(root.querySelector('[data-manual-order]').value);if(!Number.isFinite(re)||!Number.isFinite(im)||!Number.isFinite(order))return;addPoint(root.querySelector('[data-manual-type]').value,re,im,order);update();});
   root.querySelector('[data-clear]').addEventListener('click',()=>{points=[];update();});
+  root.querySelector('[data-clear-zeros]').addEventListener('click',()=>{points=points.filter(p=>p.type!=='zero');update();});
+  const presets={
+    positive:[{re:.72,im:0,order:1}],
+    negative:[{re:-.72,im:0,order:1}],
+    complex:[{re:.78,im:.55,order:1},{re:.78,im:-.55,order:1}],
+    unit:[{re:.81,im:.59,order:1},{re:.81,im:-.59,order:1}],
+    outside:[{re:1.12,im:0,order:1}],
+    repeated:[{re:.78,im:0,order:2}],
+  };
+  root.querySelectorAll('[data-preset]').forEach(button=>button.addEventListener('click',()=>{
+    const spec=presets[button.dataset.preset];points=[];const group=nextGroup++;
+    spec.forEach((p)=>points.push({id:nextId++,group:spec.length===2?group:nextGroup++,type:'pole',...p}));
+    realSystem=true;root.querySelector('[data-system-type]').value='real';update();
+  }));
+  root.querySelector('[data-sample-count]').addEventListener('change',(event)=>{sampleCount=clamp(Math.round(Number(event.target.value)||40),12,96);event.target.value=sampleCount;drawStem();});
   surface.addEventListener('pointerdown',(e)=>{surfaceDrag={x:e.clientX,y:e.clientY};surface.setPointerCapture(e.pointerId);});
   surface.addEventListener('pointermove',(e)=>{if(!surfaceDrag)return;yaw+=(e.clientX-surfaceDrag.x)*.008;pitch=clamp(pitch+(e.clientY-surfaceDrag.y)*.008,.2,1.35);surfaceDrag={x:e.clientX,y:e.clientY};root.querySelector('[data-view-state]').textContent='Đã xoay';drawSurface();});
   surface.addEventListener('pointerup',()=>surfaceDrag=null);
@@ -293,8 +388,10 @@ const id = `rational-z-${Math.random().toString(36).slice(2)}`;
   button{padding:.42rem .65rem;color:var(--sl-color-text);background:transparent;border:1px solid var(--sl-color-gray-4);border-radius:7px;font:inherit;cursor:pointer}.primary{color:var(--sl-color-black);background:var(--sl-color-accent-high);border-color:var(--sl-color-accent-high);font-weight:700}
   .manual-form{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--sl-color-gray-5)}.manual-grid{display:grid;grid-template-columns:1.1fr .85fr .85fr .75fr auto;gap:.5rem;align-items:end;margin-top:.55rem}.manual-grid label,.point-row label{font-size:.75rem;color:var(--sl-color-gray-2)}.manual-grid button{height:2.2rem}
   .point-list-heading{margin-top:1rem}.point-list{display:grid;gap:.45rem;margin-top:.55rem}.point-row{display:grid;grid-template-columns:24px 76px repeat(3,1fr) auto;gap:.45rem;align-items:end;padding:.45rem;background:color-mix(in srgb,var(--sl-color-bg) 80%,var(--sl-color-gray-6));border-radius:8px}.point-row strong{align-self:center;font-size:.8rem}.point-symbol{align-self:center;text-align:center;font-size:1.45rem;font-weight:700}.point-row.zero .point-symbol{color:var(--sl-color-accent-high)}.point-row.pole .point-symbol{color:var(--sl-color-orange-high)}.empty{margin:.5rem 0;color:var(--sl-color-gray-2);font-size:.85rem}
+  .list-actions{display:flex;gap:.4rem}.mode-presets{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--sl-color-gray-5)}.mode-presets p{margin:.2rem 0 .65rem;color:var(--sl-color-gray-2);font-size:.8rem}.preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem}.preset-grid button{text-align:left;font-size:.78rem}
   .rotate-hint{position:absolute;left:50%;bottom:.7rem;transform:translateX(-50%);padding:.32rem .6rem;border-radius:999px;color:var(--sl-color-gray-1);background:color-mix(in srgb,var(--sl-color-bg) 80%,transparent);font-size:.76rem;white-space:nowrap;pointer-events:none}.color-scale{display:flex;align-items:center;gap:.6rem;margin:.55rem .2rem;color:var(--sl-color-gray-2);font-size:.72rem}.color-scale i{height:8px;flex:1;border-radius:999px;background:linear-gradient(90deg,#2c76a6,#39cdb7,#f57e42)}
   .surface-actions,.lab-options,.resolution-control{display:flex;align-items:center;gap:.55rem}.surface-actions output{color:var(--sl-color-gray-2);font-size:.76rem}.lab-options{justify-content:space-between;flex-wrap:wrap;margin-top:.8rem;padding:.65rem 0;border-top:1px solid var(--sl-color-gray-5);border-bottom:1px solid var(--sl-color-gray-5)}.lab-options label{display:flex;align-items:center;gap:.55rem;font-size:.82rem}.lab-options select{max-width:240px;padding:.38rem .5rem;color:var(--sl-color-text);background:var(--sl-color-bg);border:1px solid var(--sl-color-gray-4);border-radius:6px}.resolution-control span{font-size:.82rem}.resolution-control output{min-width:58px;text-align:center;font: .8rem ui-monospace,monospace}.resolution-control button{min-width:2rem}.resolution-control button:disabled{opacity:.45;cursor:not-allowed}
   .equation{margin-top:.8rem;padding:1rem;border-left:3px solid var(--sl-color-accent-high);background:color-mix(in srgb,var(--sl-color-bg) 82%,var(--sl-color-gray-6))}.factor-form{display:flex;align-items:center;gap:.65rem;font-family:ui-monospace,monospace;font-size:1rem}.fraction{display:inline-grid;text-align:center}.fraction span{padding:.28rem .5rem}.fraction span:first-child{border-bottom:1px solid currentColor}.polynomials{display:grid;gap:.25rem;margin-top:.75rem;color:var(--sl-color-gray-2);font: .78rem ui-monospace,monospace;overflow-wrap:anywhere}.surface-note{margin:.7rem 0 0}
-  @media(max-width:600px){.rz-header{align-items:flex-start;flex-direction:column}.legend{flex-wrap:wrap}.hint{display:none}.rz-panel{padding:.7rem}.manual-grid{grid-template-columns:repeat(2,1fr)}.manual-grid button{grid-column:1/-1}.point-row{grid-template-columns:24px 1fr 1fr}.point-row strong{grid-column:2/-1}.point-row button{grid-column:3}.surface-title-row{align-items:flex-start}.surface-actions{align-items:flex-end;flex-direction:column}.lab-options{align-items:stretch;flex-direction:column}.resolution-control{justify-content:space-between}.surface-wrap canvas{height:430px}.rotate-hint{font-size:.68rem}.factor-form{font-size:.8rem;overflow-x:auto}}
+  .impulse-title-row{flex-wrap:wrap}.sample-control{display:flex;align-items:center;gap:.5rem;color:var(--sl-color-gray-2);font-size:.8rem}.sample-control input{width:72px;padding:.38rem .5rem;color:var(--sl-color-text);background:var(--sl-color-bg);border:1px solid var(--sl-color-gray-4);border-radius:6px}.mode-summary{margin:.8rem 0;padding:.65rem .8rem;border-left:3px solid var(--sl-color-orange-high);background:color-mix(in srgb,var(--sl-color-bg) 82%,var(--sl-color-gray-6));font-size:.86rem}.stem-wrap{overflow:hidden;border-radius:10px;background:var(--sl-color-bg)}.stem-wrap canvas{height:clamp(280px,38vw,460px)}.stem-legend{display:flex;gap:1rem;margin-top:.55rem;color:var(--sl-color-gray-2);font-size:.76rem}.stem-legend span{display:flex;align-items:center;gap:.35rem}.stem-legend i{width:18px;border-top:3px solid}.real-sample{border-color:var(--sl-color-accent-high)!important}.imag-sample{border-color:var(--sl-color-orange-high)!important}
+  @media(max-width:600px){.rz-header{align-items:flex-start;flex-direction:column}.legend{flex-wrap:wrap}.hint{display:none}.rz-panel{padding:.7rem}.manual-grid{grid-template-columns:repeat(2,1fr)}.manual-grid button{grid-column:1/-1}.point-row{grid-template-columns:24px 1fr 1fr}.point-row strong{grid-column:2/-1}.point-row button{grid-column:3}.list-actions{flex-wrap:wrap;justify-content:flex-end}.preset-grid{grid-template-columns:repeat(2,1fr)}.surface-title-row{align-items:flex-start}.surface-actions{align-items:flex-end;flex-direction:column}.lab-options{align-items:stretch;flex-direction:column}.resolution-control{justify-content:space-between}.surface-wrap canvas{height:430px}.stem-wrap canvas{height:310px}.rotate-hint{font-size:.68rem}.factor-form{font-size:.8rem;overflow-x:auto}}
 </style>

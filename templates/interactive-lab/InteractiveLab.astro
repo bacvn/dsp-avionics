@@ -1,0 +1,66 @@
+---
+const id = `interactive-lab-${Math.random().toString(36).slice(2)}`;
+---
+
+<section class="interactive-lab" id={id}>
+  <header class="lab-header">
+    <div>
+      <span class="eyebrow">INTERACTIVE DSP LAB</span>
+      <h2>Tên mô phỏng</h2>
+      <p>Một câu mô tả ngắn về điều người học sẽ quan sát.</p>
+    </div>
+    <label>Tham số
+      <select data-parameter>
+        <option value="a">A</option>
+        <option value="b">B</option>
+      </select>
+    </label>
+  </header>
+
+  <section class="panel">
+    <div class="panel-heading"><span>01</span><h3>Trực quan chính</h3></div>
+    <svg data-diagram viewBox="0 0 800 360" role="img" aria-label="Mô tả diagram"></svg>
+  </section>
+
+  <output data-status aria-live="polite">Sẵn sàng</output>
+</section>
+
+<script define:vars={{ id }}>
+  const root = document.getElementById(id);
+  const state = { parameter: 'a' };
+  const diagram = root.querySelector('[data-diagram]');
+  const status = root.querySelector('[data-status]');
+
+  function calculate() {
+    return { label: state.parameter === 'a' ? 'Trạng thái A' : 'Trạng thái B' };
+  }
+
+  function renderDiagram(result) {
+    diagram.innerHTML = `<circle class="sample-node" cx="400" cy="180" r="34"></circle><text class="sample-label" x="400" y="185">${result.label}</text>`;
+  }
+
+  function renderAll() {
+    const result = calculate();
+    renderDiagram(result);
+    status.textContent = result.label;
+  }
+
+  root.querySelector('[data-parameter]').addEventListener('change', (event) => {
+    state.parameter = event.target.value;
+    renderAll();
+  });
+
+  renderAll();
+</script>
+
+<style>
+  .interactive-lab{--lab-bg:var(--sl-color-bg);--lab-panel:var(--sl-color-gray-7,var(--sl-color-bg));--lab-soft:var(--sl-color-gray-6);--lab-border:var(--sl-color-gray-5);--lab-text:var(--sl-color-white);--lab-muted:var(--sl-color-gray-2);--lab-accent:var(--sl-color-accent);width:100%;max-width:100%;margin:2rem 0;padding:1rem;border:1px solid var(--lab-border);border-radius:1rem;background:var(--lab-bg);color:var(--lab-text)}
+  .interactive-lab *{box-sizing:border-box}.lab-header,.panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}.lab-header h2{margin:.2rem 0}.lab-header p{margin:0;color:var(--lab-muted)}.eyebrow,.panel-heading span{color:var(--lab-accent);font-size:.75rem;font-weight:800;letter-spacing:.12em}.lab-header label{display:grid;gap:.3rem;color:var(--lab-muted);font-size:.78rem}.lab-header select{min-height:2.4rem;border:1px solid var(--lab-border);border-radius:.5rem;background:var(--lab-soft);color:var(--lab-text);padding:.35rem .55rem}.panel{margin-top:1rem;padding:1rem;border:1px solid var(--lab-border);border-radius:.85rem;background:var(--lab-panel)}.panel-heading{justify-content:flex-start;align-items:center}.panel-heading h3{margin:0;font-size:1rem}.panel svg{display:block;width:100%;height:auto;margin-top:.75rem;background:var(--lab-soft);border-radius:.65rem}output{display:block;margin-top:.75rem;color:var(--lab-muted)}
+  @media(max-width:650px){.lab-header{flex-direction:column}.lab-header label{width:100%}.panel{padding:.7rem}}
+</style>
+
+<style is:global>
+  .interactive-lab .sample-node{fill:var(--sl-color-accent-low);stroke:var(--sl-color-accent);stroke-width:2}
+  .interactive-lab .sample-label{fill:var(--sl-color-white);font:600 14px system-ui;text-anchor:middle}
+</style>
+

@@ -19,6 +19,12 @@ export default defineConfig({
       },
       favicon: '/favicon.svg',
       customCss: ['./src/styles/custom.css'],
+      head: [
+        {
+          tag: 'script',
+          attrs: { src: '/site-shell.js', defer: true },
+        },
+      ],
       sidebar: [
         { label: 'Bắt đầu', items: [{ label: 'Tổng quan khóa học', slug: '' }, { label: 'Lộ trình học', slug: 'lo-trinh' }] },
         {

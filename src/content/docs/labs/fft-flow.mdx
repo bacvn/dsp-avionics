@@ -1,0 +1,41 @@
+---
+title: Lab — Theo dấu luồng FFT
+description: Đi qua từng butterfly, twiddle và kết quả trung gian để thấy FFT tổ chức lại DFT như thế nào.
+sidebar:
+  order: 4
+---
+
+import FFTFlowLab from '../../../components/FFTFlowLab.astro';
+
+## Mục tiêu
+
+Sau bài lab này, bạn có thể:
+
+1. Giải thích vì sao radix-2 DIT FFT dùng thứ tự đảo bit ở đầu vào.
+2. Theo dõi một mẫu $x[n]$ qua các butterfly đến từng output $X[k]$.
+3. Liên hệ twiddle $W_N^k=e^{-j2\pi k/N}$ với một phép quay trên mặt phẳng phức.
+4. Chỉ ra kết quả trung gian nào được tính một lần rồi tái sử dụng.
+5. Phân biệt số phép tính của FFT với cách tính DFT trực tiếp.
+
+FFT không tạo ra một phép biến đổi mới. Nó phân rã DFT thành các bài toán nhỏ hơn, khai thác đối xứng của twiddle và tái sử dụng các tổng–hiệu trung gian.
+
+<FFTFlowLab />
+
+## Hoạt động gợi ý
+
+1. Giữ $N=4$, chọn lần lượt bốn bước phía trên sơ đồ. Ở bước **Butterfly**, click một node trung gian và quan sát cả nguồn tạo ra nó lẫn các output sử dụng nó.
+2. Ở bước **Twiddle**, chọn $W_4^1$. Đối chiếu vector $-j$ với vector đối cực $j$ trên đường tròn đơn vị.
+3. Chọn từng output $X[k]$. Kiểm tra xem cả bốn input có xuất hiện trong dòng phụ thuộc được tô sáng hay không.
+4. Mở phần so sánh DFT sau khi đã theo hết luồng FFT. Tăng lên $N=8$ và $N=16$ để quan sát tốc độ tăng của hai cách đếm phép toán.
+
+:::note[Cách đọc số phép tính]
+Số “nhân twiddle” trong bảng là số đếm theo cấu trúc butterfly. Trên phần cứng, nhân với $1$, $-1$ hoặc $\pm j$ rẻ hơn nhiều so với một phép nhân phức tổng quát.
+:::
+
+## Câu hỏi tự kiểm tra
+
+1. Vì sao $a_0=x[0]+x[2]$ có thể phục vụ cả $X[0]$ và $X[2]$?
+2. Nhân một số phức với $-j$ làm thay đổi phần thực và phần ảo như thế nào?
+3. Khi tăng từ $N=8$ lên $N=16$, số tầng FFT tăng thêm bao nhiêu?
+4. FFT và DFT có tạo ra hai phổ khác nhau không? Nếu không, khác biệt nằm ở đâu?
+5. Vì sao nói lợi ích của FFT đến từ “phân rã và tái sử dụng”, chứ không chỉ từ việc sơ đồ có ít đường nối hơn?

@@ -1,0 +1,273 @@
+---
+import katex from 'katex';
+const id = `fft-flow-${Math.random().toString(36).slice(2)}`;
+const renderMath = (source: string, displayMode = false) => katex.renderToString(source, { throwOnError: false, displayMode });
+const twiddleLabels = Object.fromEntries([4, 8, 16].map((N) => [N, Object.fromEntries(Array.from({ length: N / 2 }, (_, k) => [k, {
+  positive: renderMath(`W_{${N}}^{${k}}`), negative: renderMath(`-W_{${N}}^{${k}}`),
+  positiveNumeric: renderMath(`${k === 0 ? '1' : `e^{-j2\\pi ${k}/${N}}`}`),
+  negativeNumeric: renderMath(`${k === 0 ? '-1' : `-e^{-j2\\pi ${k}/${N}}`}`),
+}]))]));
+---
+
+<section class="fft-lab" id={id}>
+  <header class="lab-header">
+    <div>
+      <span class="eyebrow">RADIX-2 DIT FFT LAB</span>
+      <h2>Đi theo từng phép tính của FFT</h2>
+      <p>Click một node hoặc hệ số để truy vết toàn bộ đường tính toán liên quan.</p>
+    </div>
+    <div class="compact-controls">
+      <label>Kích thước<select data-size><option value="4">N = 4</option><option value="8">N = 8</option><option value="16">N = 16</option></select></label>
+      <label>Đầu vào<select data-input-mode><option value="symbolic">Tổng quát</option><option value="numeric">Dãy số</option></select></label>
+      <label class="sequence-field" data-sequence-wrap hidden>Dãy x<sub>n</sub><input data-sequence value="1, 2, 3, 4" aria-label="Dãy đầu vào, cách nhau bằng dấu phẩy" /></label>
+    </div>
+  </header>
+
+  <section class="panel flow-panel" aria-labelledby={`${id}-flow-title`}>
+      <div class="panel-heading">
+        <div><span class="panel-index">01</span><h3 id={`${id}-flow-title`}>Sơ đồ cánh bướm</h3></div>
+        <button type="button" class="clear-selection" data-clear>Hủy chọn</button>
+      </div>
+      <div class="flow-scroll" data-flow-scroll>
+        <svg data-flow role="img" aria-label="Sơ đồ butterfly FFT tương tác"></svg>
+      </div>
+      <div class="legend" aria-label="Chú giải">
+        <span><i class="signal-line"></i>Hệ số ×1</span>
+        <span><i class="twiddle-line"></i>Hệ số ×W<sub>N</sub><sup>k</sup></span>
+        <span><i class="negative-line"></i>Hệ số ×(−W<sub>N</sub><sup>k</sup>)</span>
+        <span><i class="node-swatch">Σ</i>Nút tổng</span>
+        <span><i class="output-swatch"></i>Output</span>
+      </div>
+  </section>
+
+  <div class="analysis-grid">
+    <section class="panel equations-panel" aria-labelledby={`${id}-equations-title`}>
+      <div class="panel-heading"><div><span class="panel-index">02</span><h3 id={`${id}-equations-title`}>Khai triển biểu thức</h3></div></div>
+      <div class="matrix-expression" data-matrix aria-live="polite"></div>
+    </section>
+    <section class="panel plane-panel" aria-labelledby={`${id}-plane-title`}>
+      <div class="panel-heading"><div><span class="panel-index">03</span><h3 id={`${id}-plane-title`}>Mặt phẳng phức</h3></div></div>
+      <canvas data-plane width="420" height="420" tabindex="0" role="img" aria-label="Các điểm twiddle trên đường tròn đơn vị"></canvas>
+      <div class="plane-note" data-plane-note>Click một điểm W để liên kết với graph và ma trận.</div>
+    </section>
+  </div>
+
+  <details class="comparison" data-comparison>
+    <summary>Bây giờ mới so sánh với DFT trực tiếp</summary>
+    <div class="comparison-intro">
+      <div><strong>Cùng một kết quả</strong><p>FFT không phải phép biến đổi khác. FFT chỉ tổ chức lại DFT để dùng lại các tổng, hiệu và đối xứng của twiddle.</p></div>
+      <div class="identity" data-match>DFT(x) = FFT(x) ✓</div>
+    </div>
+    <div class="compare-grid">
+      <section>
+        <h3>DFT trực tiếp</h3>
+        <div class="direct-graph" data-direct-graph aria-label="Minh họa kết nối đầy đủ của DFT"></div>
+        <p>Mỗi X[k] tự cộng N tích. Không có node trung gian dùng chung.</p>
+      </section>
+      <section>
+        <h3>FFT radix-2</h3>
+        <div class="reuse-graph" data-reuse-graph></div>
+        <p>Mỗi tầng gồm N/2 butterfly; kết quả của tầng trước được dùng lại ở tầng sau.</p>
+      </section>
+    </div>
+    <div class="count-grid" data-counts></div>
+    <p class="count-note">“Nhân twiddle” là số đếm cấu trúc. Nhân với 1 không cần phép nhân; nhân với −1 chỉ đổi dấu; nhân với ±j chỉ đổi chỗ phần thực–ảo và đổi dấu.</p>
+  </details>
+</section>
+
+<script define:vars={{ id, twiddleLabels }}>
+  const root = document.getElementById(id);
+  const $ = (selector) => root.querySelector(selector);
+  const svg = $('[data-flow]');
+  const plane = $('[data-plane]');
+  const state = { N:4, mode:'symbolic', values:[], model:null, selected:null };
+  const C = (re=0, im=0) => ({ re, im });
+  const add = (a,b) => C(a.re+b.re,a.im+b.im);
+  const sub = (a,b) => C(a.re-b.re,a.im-b.im);
+  const mul = (a,b) => C(a.re*b.re-a.im*b.im,a.re*b.im+a.im*b.re);
+  const W = (N,k) => C(Math.cos(-2*Math.PI*k/N),Math.sin(-2*Math.PI*k/N));
+  const clean = (v) => Math.abs(v)<1e-9?0:Math.round(v*1e6)/1e6;
+  const fmtNum = (v) => Number.isInteger(clean(v))?String(clean(v)):String(clean(v).toFixed(3)).replace(/0+$/,'').replace(/\.$/,'');
+  const fmt = (z) => { const re=clean(z.re), im=clean(z.im); if(!im)return fmtNum(re); if(!re)return `${im<0?'−':''}${Math.abs(im)===1?'':fmtNum(Math.abs(im))}j`; return `${fmtNum(re)} ${im<0?'−':'+'} ${Math.abs(im)===1?'':fmtNum(Math.abs(im))}j`; };
+  const esc = (s) => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function parseComplex(raw){
+    let s=raw.trim().toLowerCase().replace(/\s+/g,'').replace(/i/g,'j');if(!s)return null;
+    if(!s.includes('j')){const re=Number(s);return Number.isFinite(re)?C(re,0):null;}
+    if(!s.endsWith('j'))return null;const body=s.slice(0,-1);let split=-1;for(let i=1;i<body.length;i++)if(body[i]=='+'||body[i]=='-')split=i;
+    if(split<0){const token=body===''||body==='+'?'1':body==='-'?'-1':body,im=Number(token);return Number.isFinite(im)?C(0,im):null;}
+    const re=Number(body.slice(0,split)),token=body.slice(split),im=Number(token==='+'?1:token==='-'?-1:token);return Number.isFinite(re)&&Number.isFinite(im)?C(re,im):null;
+  }
+  function bitReverse(v,bits){let out=0;for(let i=0;i<bits;i++){out=(out<<1)|(v&1);v>>=1;}return out;}
+  function buildModel(N){
+    const stages=Math.log2(N), nodes=[], edges=[], byId=new Map(), forward=new Map(), backward=new Map(), butterflies=[];
+    const addNode=(node)=>{nodes.push(node);byId.set(node.id,node);forward.set(node.id,new Set());backward.set(node.id,new Set());};
+    for(let r=0;r<N;r++){const logical=bitReverse(r,stages);addNode({id:`s0-r${r}`,stage:0,row:r,type:'input',logical,label:`x[${logical}]`,ancestors:new Set([`input-${logical}`])});}
+    for(let s=1;s<=stages;s++)for(let r=0;r<N;r++)addNode({id:`s${s}-r${r}`,stage:s,row:r,type:s===stages?'output':'intermediate',logical:r,label:s===stages?`X[${r}]`:`v${s}[${r}]`,ancestors:new Set()});
+    const addEdge=(from,to,kind,twiddleK=null,butterfly='')=>{const id=`e-${from}-${to}`;edges.push({id,from,to,kind,twiddleK,butterfly});forward.get(from).add(to);backward.get(to).add(from);};
+    for(let s=1;s<=stages;s++){
+      const size=2**s, half=size/2;
+      for(let base=0;base<N;base+=size)for(let k=0;k<half;k++){
+        const top=base+k,bottom=base+k+half,twK=k*N/size,bid=`b-s${s}-r${top}`;
+        butterflies.push({id:bid,stage:s,top,bottom,twiddleK:twK});
+        addEdge(`s${s-1}-r${top}`,`s${s}-r${top}`,'unit',null,bid);
+        addEdge(`s${s-1}-r${bottom}`,`s${s}-r${top}`,'twiddle-positive',twK,bid);
+        addEdge(`s${s-1}-r${top}`,`s${s}-r${bottom}`,'unit',null,bid);
+        addEdge(`s${s-1}-r${bottom}`,`s${s}-r${bottom}`,'twiddle-negative',twK,bid);
+      }
+    }
+    for(const node of nodes.filter(n=>n.stage>0)){const stack=[node.id],seen=new Set();while(stack.length){const id=stack.pop();for(const p of backward.get(id)||[]){if(!seen.has(p)){seen.add(p);stack.push(p);const pn=byId.get(p);if(pn.type==='input')node.ancestors.add(`input-${pn.logical}`);}}}}
+    return {N,stages,nodes,edges,byId,forward,backward,butterflies};
+  }
+  function calculate(){
+    const {N,stages,byId}=state.model, order=Array.from({length:N},(_,r)=>bitReverse(r,stages));
+    order.forEach((logical,r)=>byId.get(`s0-r${r}`).value=state.values[logical]);
+    for(let s=1;s<=stages;s++){
+      const size=2**s,half=size/2;
+      for(let base=0;base<N;base+=size)for(let k=0;k<half;k++){
+        const top=base+k,bottom=base+k+half,u=byId.get(`s${s-1}-r${top}`).value,v=byId.get(`s${s-1}-r${bottom}`).value,t=mul(W(N,k*N/size),v);
+        byId.get(`s${s}-r${top}`).value=add(u,t);byId.get(`s${s}-r${bottom}`).value=sub(u,t);
+      }
+    }
+  }
+  function trace(id){
+    const nodes=new Set(),edges=new Set(),stack=[id],directions=['backward','forward'];
+    for(const direction of directions){stack.splice(0,stack.length,id);const seen=new Set([id]);while(stack.length){const cur=stack.pop();nodes.add(cur);const map=state.model[direction];for(const next of map.get(cur)||[]){if(!seen.has(next)){seen.add(next);stack.push(next);}for(const e of state.model.edges)if((e.from===cur&&e.to===next)||(e.to===cur&&e.from===next))edges.add(e.id);}}}
+    return {nodes,edges};
+  }
+  function activeEntity(){return state.selected;}
+  const svgIndex = (base,index) => `${base}<tspan class="svg-sub" baseline-shift="sub">${index}</tspan>`;
+  function renderFlow(){
+    const {N,stages,nodes,edges}=state.model,rowGap=N===16?34:N===8?46:66,nodeRadius=N===16?11:N===8?14:17;
+    const width=Math.max(530,(stages+1)*145+80),height=N*rowGap+24,xGap=(width-90)/stages;
+    svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.style.minWidth='0';
+    const pos=new Map(nodes.map(n=>[n.id,{x:45+n.stage*xGap,y:42+n.row*rowGap}]));
+    const active=activeEntity();let traced=null;if(active&&state.model.byId.has(active))traced=trace(active);
+    const edgeEntity=(e)=>e.twiddleK===null?e.from:`twiddle-${e.twiddleK}-${e.kind==='twiddle-negative'?'negative':'positive'}`;
+    const edgeActive=(e)=>!active||(traced&&traced.edges.has(e.id))||active===edgeEntity(e);
+    let html=`<title>FFT ${N} điểm gồm ${stages} tầng butterfly</title><desc>Chọn node hoặc nhánh để lần theo quan hệ phụ thuộc.</desc>`;
+    for(let s=0;s<=stages;s++){const x=45+s*xGap;html+=`<text class="stage-title" x="${x}" y="20">${s===0?'Input':s===stages?'Output':`Stage ${s}`}</text>`;}
+    for(const e of edges){const a=pos.get(e.from),b=pos.get(e.to),isTw=e.twiddleK!==null,entity=edgeEntity(e),cls=`edge ${e.kind} ${edgeActive(e)?'active':'dim'}`;html+=`<path id="${e.id}" class="${cls}" data-entity="${entity}" d="M${a.x+nodeRadius},${a.y} C${a.x+xGap*.44},${a.y} ${b.x-xGap*.44},${b.y} ${b.x-nodeRadius},${b.y}"/>`;if(isTw){const lx=(a.x+b.x)/2,ly=(a.y+b.y)/2+(e.kind==='twiddle-negative'?10:-9),key=e.kind==='twiddle-negative'?'negative':'positive',math=twiddleLabels[N][e.twiddleK][state.mode==='numeric'?`${key}Numeric`:key];html+=`<foreignObject class="twiddle-label ${e.kind} ${edgeActive(e)?'active':'dim'}" data-entity="${entity}" x="${lx-31}" y="${ly-9}" width="62" height="20"><div xmlns="http://www.w3.org/1999/xhtml" class="twiddle-math">${math}</div></foreignObject>`;}}
+    for(const n of nodes){const p=pos.get(n.id),isActive=!active||(traced&&traced.nodes.has(n.id))||active===n.id;let label,aria;if(state.mode==='numeric'&&(n.type==='input'||n.type==='output')){label=esc(fmt(n.value));aria=`giá trị ${fmt(n.value)}`;}else{label=n.type==='input'?svgIndex('x',n.logical):n.type==='output'?svgIndex('X',n.row):'Σ';aria=n.type==='input'?`x ${n.logical}`:n.type==='output'?`X ${n.row}`:'nút tổng';}if(n.type==='intermediate'){label='Σ';aria='nút tổng';}html+=`<g class="node-group ${isActive?'active':'dim'}" data-entity="${n.id}" role="button" tabindex="0" aria-label="${aria}"><circle class="node ${n.type}" cx="${p.x}" cy="${p.y}" r="${nodeRadius}"/><text class="node-label" x="${p.x}" y="${p.y+2}">${label}</text></g>`;}
+    svg.innerHTML=html;
+  }
+  function selectedTwiddle(){const a=activeEntity();if(!a||!a.startsWith('twiddle-'))return null;const [,k,sign]=a.split('-');return {k:Number(k),sign};}
+  function drawPlane(){
+    const rect=plane.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),w=Math.max(280,rect.width),h=Math.max(230,rect.height);plane.width=w*dpr;plane.height=h*dpr;const ctx=plane.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+    const css=(name,fallback)=>getComputedStyle(root).getPropertyValue(name).trim()||fallback,bg=css('--sl-color-gray-6','#10243b'),fg=css('--sl-color-white','#eef7ff'),grid=css('--sl-color-gray-4','#385067'),blue=css('--sl-color-accent','#16b8b0'),orange=css('--sl-color-orange-high','#fb923c');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);const cx=w/2,cy=h/2,r=Math.min(w,h)*.34;
+    ctx.strokeStyle=grid;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx-r-22,cy);ctx.lineTo(cx+r+22,cy);ctx.moveTo(cx,cy-r-22);ctx.lineTo(cx,cy+r+22);ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.fillStyle=fg;ctx.font='12px system-ui';ctx.fillText('1',cx+r+6,cy-6);ctx.fillText('−1',cx-r-22,cy-6);ctx.fillText('j',cx+7,cy-r+4);ctx.fillText('−j',cx+7,cy+r+15);
+    const selected=selectedTwiddle();for(let k=0;k<state.N;k++){const z=W(state.N,k),px=cx+z.re*r,py=cy-z.im*r,isSelected=selected&&(selected.sign==='positive'?k===selected.k:k===selected.k+state.N/2);ctx.fillStyle=isSelected?blue:grid;ctx.globalAlpha=isSelected?1:.28;ctx.beginPath();ctx.arc(px,py,isSelected?6:4,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;if(selected===null){$('[data-plane-note]').textContent=`${state.N} điểm W được đặt sẵn; click để chọn.`;return;}const base=W(state.N,selected.k),z=selected.sign==='negative'?C(-base.re,-base.im):base,anti=C(-z.re,-z.im);const arrow=(v,color,dash)=>{ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=3;ctx.setLineDash(dash?[7,6]:[]);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+v.re*r,cy-v.im*r);ctx.stroke();ctx.setLineDash([]);};arrow(anti,orange,true);arrow(z,blue,false);const sign=selected.sign==='negative'?'−':'';$('[data-plane-note]').innerHTML=state.mode==='symbolic'?`<strong>${sign}W<sub>${state.N}</sub><sup>${selected.k}</sup></strong>`:`<strong>${sign}W<sub>${state.N}</sub><sup>${selected.k}</sup> = ${esc(fmt(z))}</strong>`;
+  }
+  const matrixEntity=(exp,N)=>exp<N/2?`twiddle-${exp}-positive`:`twiddle-${exp-N/2}-negative`;
+  function renderMatrix(){
+    const {N,stages}=state.model,selected=activeEntity(),cell=(k,n)=>{const exp=(k*n)%N,entity=matrixEntity(exp,N),cls=selected&&selected.startsWith('twiddle-')?(selected===entity?'active':'dim'):'';if(state.mode==='symbolic'){const base=exp<N/2?exp:exp-N/2,key=exp<N/2?'positive':'negative';return `<button class="${cls}" data-entity="${entity}">${twiddleLabels[N][base][key]}</button>`;}return `<button class="${cls}" data-entity="${entity}">${esc(fmt(W(N,exp)))}</button>`;};
+    const vector=(items,kind)=>`<div class="matrix-vector ${kind}">${items.map(x=>`<span>${x}</span>`).join('')}</div>`;
+    const outputs=state.mode==='symbolic'?Array.from({length:N},(_,k)=>`X<sub>${k}</sub>`):Array.from({length:N},(_,k)=>esc(fmt(state.model.byId.get(`s${stages}-r${k}`).value)));
+    const inputs=state.mode==='symbolic'?Array.from({length:N},(_,n)=>`x<sub>${n}</sub>`):state.values.map(v=>esc(fmt(v)));
+    $('[data-matrix]').innerHTML=`<div class="matrix-scroll"><div class="matrix-equation">${vector(outputs,'output-vector')}<span class="matrix-op">=</span><div class="coefficient-matrix" style="--n:${N}">${Array.from({length:N},(_,k)=>Array.from({length:N},(_,n)=>cell(k,n)).join('')).join('')}</div><span class="matrix-op">·</span>${vector(inputs,'input-vector')}</div></div>`;
+  }
+  function directDFT(values){return values.map((_,k)=>values.reduce((sum,x,n)=>add(sum,mul(x,W(values.length,k*n))),C()));}
+  function renderComparison(){
+    const N=state.N,st=Math.log2(N),dftMul=N*N,dftAdd=N*(N-1),butterflies=N/2*st,fftAdd=N*st,fftOut=directDFT(state.values),fftValues=Array.from({length:N},(_,k)=>state.model.byId.get(`s${st}-r${k}`).value),ok=fftOut.every((z,k)=>Math.hypot(z.re-fftValues[k].re,z.im-fftValues[k].im)<1e-7);
+    $('[data-match]').textContent=ok?'DFT(x) = FFT(x) ✓':'Cần kiểm tra dữ liệu';
+    $('[data-direct-graph]').innerHTML=`<svg viewBox="0 0 360 160" role="img" aria-label="${N} input nối tới ${N} output"><g>${Array.from({length:Math.min(N,8)},(_,i)=>Array.from({length:Math.min(N,8)},(_,k)=>`<line x1="35" y1="${18+i*18}" x2="325" y2="${18+k*18}"/>`).join('')).join('')}</g><text x="8" y="154">N input</text><text x="300" y="154">N output</text></svg>`;
+    $('[data-reuse-graph]').innerHTML=`<div class="reuse-stages">${Array.from({length:st},(_,s)=>`<div><strong>Stage ${s+1}</strong><span>${N/2} butterfly</span><small>${N} phép +/−</small></div>`).join('<b>→</b>')}</div>`;
+    const ratio=(dftMul/butterflies).toFixed(1);$('[data-counts]').innerHTML=`<div><span>DFT · nhân phức</span><strong>${dftMul}</strong><small>N²</small></div><div><span>FFT · nhân twiddle</span><strong>${butterflies}</strong><small>(N/2)log₂N</small></div><div><span>DFT · cộng phức</span><strong>${dftAdd}</strong><small>N(N−1)</small></div><div><span>FFT · cộng/trừ</span><strong>${fftAdd}</strong><small>Nlog₂N</small></div><div class="saving"><span>Giảm phép nhân cấu trúc</span><strong>${ratio}×</strong><small>tại N=${N}</small></div>`;
+  }
+  function renderAll(){calculate();renderFlow();drawPlane();renderMatrix();renderComparison();}
+  function resetSize(N){state.N=N;state.model=buildModel(N);state.selected=null;state.values=Array.from({length:N},(_,i)=>C(i+1,0));$('[data-sequence]').value=state.values.map(fmt).join(', ');renderAll();}
+  $('[data-size]').addEventListener('change',e=>resetSize(Number(e.target.value)));
+  $('[data-input-mode]').addEventListener('change',e=>{state.mode=e.target.value;$('[data-sequence-wrap]').hidden=state.mode!=='numeric';state.selected=null;renderAll();});
+  const applySequence=(input,report=false)=>{const parts=input.value.split(/[,;]+/).map(s=>s.trim()).filter(Boolean),parsed=parts.map(parseComplex),valid=parts.length===state.N&&!parsed.some(v=>!v);if(!valid){input.setAttribute('aria-invalid','true');input.setCustomValidity(`Cần đúng ${state.N} giá trị, cách nhau bằng dấu phẩy.`);if(report)input.reportValidity();return;}input.removeAttribute('aria-invalid');input.setCustomValidity('');state.values=parsed;renderAll();};
+  $('[data-sequence]').addEventListener('input',e=>applySequence(e.target,false));
+  $('[data-sequence]').addEventListener('change',e=>applySequence(e.target,true));
+  $('[data-clear]').addEventListener('click',()=>{state.selected=null;renderAll();});
+  root.addEventListener('click',e=>{const target=e.target.closest('[data-entity]');if(target){state.selected=target.dataset.entity;renderAll();}});
+  svg.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest('[data-entity]')){e.preventDefault();state.selected=e.target.closest('[data-entity]').dataset.entity;renderAll();}});
+  plane.addEventListener('click',e=>{const rect=plane.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top,cx=rect.width/2,cy=rect.height/2,r=Math.min(rect.width,rect.height)*.34;let best={k:0,d:Infinity};for(let k=0;k<state.N;k++){const z=W(state.N,k),d=Math.hypot(x-(cx+z.re*r),y-(cy-z.im*r));if(d<best.d)best={k,d};}if(best.d>24)return;state.selected=best.k<state.N/2?`twiddle-${best.k}-positive`:`twiddle-${best.k-state.N/2}-negative`;renderAll();});
+  plane.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();state.selected='twiddle-0-positive';renderAll();});
+  root.addEventListener('keydown',e=>{if(e.key==='Escape'){state.selected=null;renderAll();}});
+  new ResizeObserver(drawPlane).observe(plane);
+  resetSize(4);
+</script>
+
+<style>
+  .fft-lab{--lab-deep:var(--sl-color-gray-6);--lab-panel:var(--sl-color-gray-7,var(--sl-color-bg));--lab-panel-2:color-mix(in srgb,var(--sl-color-accent-low) 42%,var(--sl-color-bg));--lab-text:var(--sl-color-white);--lab-muted:var(--sl-color-gray-2);--lab-grid:var(--sl-color-gray-4);--lab-blue:var(--sl-color-accent);--lab-green:var(--sl-color-green-high,var(--sl-color-accent-high));--lab-orange:var(--sl-color-orange-high);--lab-purple:var(--sl-color-purple-high,var(--sl-color-accent-high));width:100%;max-width:100%;margin:2rem 0;padding:1rem;border:1px solid var(--sl-color-gray-5);border-radius:1rem;background:var(--sl-color-bg);color:var(--lab-text);overflow:hidden}.fft-lab *{box-sizing:border-box}
+  .lab-header,.panel-heading,.comparison-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}.lab-header h2{margin:.2rem 0;font-size:clamp(1.35rem,2.5vw,2.15rem);color:var(--lab-text)}.lab-header p{margin:0;color:var(--lab-muted)}.eyebrow,.panel-index{color:var(--sl-color-accent);font-size:.72rem;font-weight:800;letter-spacing:.14em}.compact-controls{display:grid;grid-template-columns:auto auto minmax(160px,260px);gap:.5rem;align-items:end}.compact-controls label{display:grid;gap:.25rem;color:var(--lab-muted);font-size:.72rem}.compact-controls select,.compact-controls input{height:2.25rem;border:1px solid var(--lab-grid);border-radius:7px;background:var(--lab-deep);color:var(--lab-text);padding:.35rem .5rem}.sequence-field[hidden]{display:none}.sequence-field input{font-family:ui-monospace,monospace}.sequence-field input[aria-invalid=true]{border-color:var(--sl-color-red)}
+  button{font:inherit}.lesson-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin:1.25rem 0 .65rem}.lesson-steps button,.preset-actions button,.flow-actions button,.comparison button{border:1px solid var(--lab-grid);border-radius:8px;background:var(--lab-panel);color:var(--lab-muted);padding:.65rem;cursor:pointer}.lesson-steps button span{display:inline-grid;place-items:center;width:1.45rem;height:1.45rem;margin-right:.3rem;border-radius:50%;background:var(--lab-deep)}.lesson-steps button.active{border-color:var(--lab-blue);color:var(--lab-text);background:var(--sl-color-accent-low)}.step-callout{padding:.8rem 1rem;border-left:3px solid var(--lab-blue);border-radius:0 8px 8px 0;background:var(--sl-color-accent-low);color:var(--lab-muted)}.step-callout strong{color:var(--lab-text)}
+  .input-toolbar{margin-top:1.1rem;align-items:center}.input-toolbar span{display:block;color:var(--lab-muted);font-size:.76rem}.preset-actions{display:flex;gap:.4rem;flex-wrap:wrap}.preset-actions button,.flow-actions button{padding:.38rem .6rem;font-size:.76rem}.input-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:.5rem;margin-top:.55rem}.input-grid label{display:grid;gap:.25rem;color:var(--lab-muted);font: .75rem ui-monospace,monospace}.input-grid input{width:100%;min-width:0;font-family:ui-monospace,monospace}.input-grid input[aria-invalid=true]{border-color:#fb7185}.input-error{margin:.45rem 0;color:#fecdd3;font-size:.78rem}
+  .flow-panel{margin-top:1rem}.analysis-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(210px,1fr);gap:1rem;margin-top:1rem;align-items:start}.panel{min-width:0;border:1px solid var(--lab-grid);border-radius:14px;background:var(--lab-panel);padding:1rem;overflow:hidden}.panel-heading{align-items:center;margin-bottom:.75rem}.panel-heading h3{display:inline;margin:0 0 0 .5rem;font-size:1rem;color:var(--lab-text)}.clear-selection{border:1px solid var(--lab-grid);border-radius:7px;background:var(--lab-deep);color:var(--lab-muted);padding:.38rem .6rem;cursor:pointer}
+  .flow-scroll{overflow:hidden;border-radius:9px;background:var(--lab-deep)}[data-flow]{display:block;width:100%;height:auto;min-height:0}.legend{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.7rem;color:var(--lab-muted);font-size:.75rem}.legend span{display:flex;align-items:center;gap:.35rem}.legend i{display:grid;place-items:center;width:23px;min-width:23px}.signal-line,.twiddle-line,.negative-line{border-top:3px solid}.signal-line{border-color:var(--lab-blue)!important}.twiddle-line{border-color:var(--lab-purple)!important}.negative-line{border-color:var(--lab-orange)!important}.node-swatch{height:20px;border:1.5px solid var(--lab-blue);border-radius:50%;color:var(--lab-blue);font-style:normal;font-weight:800}.output-swatch{width:18px!important;min-width:18px!important;height:18px;border:2px solid var(--lab-orange);border-radius:50%}
+  .plane-panel canvas{display:block;width:100%;height:auto;aspect-ratio:1;border-radius:8px;cursor:crosshair}.plane-note{min-height:2.3rem;margin-top:.55rem;color:var(--lab-muted);font-size:.78rem}.matrix-expression{min-width:0}
+  .equations-panel{margin-top:1rem}.equations-heading label{color:var(--lab-muted);font-size:.78rem}.equations{display:grid;gap:.5rem}.equation-row{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:.5rem;padding:.62rem;background:var(--lab-deep);border-radius:8px;font: .76rem ui-monospace,monospace}.terms{display:flex;align-items:center;gap:.25rem;flex-wrap:wrap}.terms button,.output-pick{border:0;background:transparent;color:inherit;padding:.2rem;cursor:pointer;font:inherit}.terms button:hover,.output-pick:hover{color:var(--lab-blue)}.output-pick{color:var(--lab-blue);font-weight:800}.terms b{color:var(--lab-muted)}.numeric{color:#73f4e7;font-weight:700;white-space:nowrap}
+  .comparison{margin-top:1rem;border:1px solid var(--lab-grid);border-radius:14px;background:var(--lab-panel);overflow:hidden}.comparison summary{padding:1rem;cursor:pointer;color:var(--lab-text);font-weight:800}.comparison[open] summary{border-bottom:1px solid var(--lab-grid)}.comparison>div,.comparison>p{margin-inline:1rem}.comparison-intro{align-items:center;margin-block:1rem}.comparison-intro p{max-width:55rem;margin:.25rem 0;color:var(--lab-muted)}.identity{padding:.6rem .8rem;border-radius:8px;background:#0c4b4b;color:#a9fff5;font:700 .8rem ui-monospace,monospace;white-space:nowrap}.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.compare-grid section{min-width:0;padding:1rem;border-radius:10px;background:var(--lab-deep)}.compare-grid h3{margin:0;color:var(--lab-text);font-size:1rem}.compare-grid p{color:var(--lab-muted);font-size:.8rem}.direct-graph svg{width:100%;height:165px}.direct-graph line{stroke:var(--lab-orange);stroke-width:1;opacity:.32}.direct-graph text{fill:var(--lab-muted);font:11px system-ui}.reuse-stages{display:flex;align-items:center;justify-content:center;gap:.5rem;min-height:165px}.reuse-stages div{display:grid;gap:.2rem;padding:.6rem;border-radius:8px;background:var(--lab-panel-2);text-align:center}.reuse-stages span,.reuse-stages small{color:var(--lab-muted);font-size:.7rem}.reuse-stages b{color:var(--lab-blue)}.count-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.55rem;margin-block:1rem}.count-grid div{display:grid;gap:.2rem;padding:.75rem;border-radius:9px;background:var(--lab-deep)}.count-grid span,.count-grid small{color:var(--lab-muted);font-size:.7rem}.count-grid strong{font-size:1.35rem;color:var(--lab-text)}.count-grid .saving{background:color-mix(in srgb,var(--lab-blue) 15%,var(--lab-deep))}.count-grid .saving strong{color:var(--lab-blue)}.count-note{padding-bottom:1rem;color:var(--lab-muted);font-size:.78rem}
+  @media(max-width:900px){.analysis-grid{grid-template-columns:1fr}.plane-panel{max-width:300px}.count-grid{grid-template-columns:repeat(3,1fr)}.compact-controls{grid-template-columns:auto auto}.sequence-field{grid-column:1/-1}}
+  @media(max-width:650px){.fft-lab{padding:.7rem}.lab-header{flex-direction:column}.compact-controls{width:100%;grid-template-columns:1fr 1fr}.sequence-field{grid-column:1/-1}.compare-grid{grid-template-columns:1fr}.panel{padding:.75rem}.panel-heading{align-items:flex-start}.count-grid{grid-template-columns:1fr 1fr}.reuse-stages{flex-wrap:wrap}.comparison-intro{align-items:flex-start;flex-direction:column}}
+</style>
+
+<style is:global>
+  .fft-lab .input-grid label{display:grid;gap:.25rem;color:var(--lab-muted);font:.75rem ui-monospace,monospace}
+  .fft-lab .input-grid input{width:100%;min-width:0;border:1px solid var(--lab-grid);border-radius:7px;background:var(--lab-deep);color:var(--lab-text);padding:.48rem .58rem;font-family:ui-monospace,monospace}
+  .fft-lab .input-grid input[aria-invalid=true]{border-color:var(--sl-color-red)}
+  .fft-lab .stage-title{fill:var(--lab-muted);font:700 10px system-ui;text-anchor:middle}
+  .fft-lab .edge{fill:none;stroke:var(--lab-grid);stroke-width:1.35;transition:opacity .13s,stroke .13s,stroke-width .13s;cursor:pointer}
+  .fft-lab .edge.unit{stroke:var(--lab-blue)}
+  .fft-lab .edge.twiddle-positive{stroke:var(--lab-purple)}
+  .fft-lab .edge.twiddle-negative{stroke:var(--lab-orange)}
+  .fft-lab .edge.active{opacity:.95}
+  .fft-lab .edge.dim,.fft-lab .node-group.dim,.fft-lab .twiddle-label.dim{opacity:.08}
+  .fft-lab .node{fill:var(--lab-panel);stroke:var(--lab-grid);stroke-width:1.25}
+  .fft-lab .node.input{fill:var(--sl-color-accent-low);stroke:var(--lab-blue)}
+  .fft-lab .node.output{fill:color-mix(in srgb,var(--lab-orange) 15%,var(--lab-panel));stroke:var(--lab-orange);stroke-width:1.8}
+  .fft-lab .node-label{fill:var(--lab-text);font:700 8px system-ui;text-anchor:middle;pointer-events:none}
+  .fft-lab .svg-sub{font-size:6px}
+  .fft-lab .node-value{fill:var(--lab-muted);font:7px ui-monospace,monospace;text-anchor:middle;pointer-events:none}
+  .fft-lab .node-group{cursor:pointer;transition:opacity .13s}
+  .fft-lab .node-group:focus .node{stroke:var(--lab-blue);stroke-width:2.5}
+  .fft-lab .node-group:focus{outline:none}
+  .fft-lab .twiddle-label{overflow:visible;cursor:pointer}
+  .fft-lab .twiddle-math{display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:var(--lab-purple);font-size:8px;white-space:nowrap}
+  .fft-lab .twiddle-negative .twiddle-math{color:var(--lab-orange)}
+  .fft-lab .twiddle-math .katex{font-size:1em}
+  .fft-lab .equation-row{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:.5rem;padding:.62rem;background:var(--lab-deep);border-radius:8px;font:.76rem ui-monospace,monospace}
+  .fft-lab .terms{display:flex;align-items:center;gap:.25rem;flex-wrap:wrap}
+  .fft-lab .terms button,.fft-lab .output-pick{border:0;background:transparent;color:inherit;padding:.2rem;cursor:pointer;font:inherit}
+  .fft-lab .terms button:focus-visible,.fft-lab .output-pick:focus-visible{outline:2px solid var(--lab-blue);outline-offset:2px}
+  .fft-lab .output-pick{color:var(--lab-blue);font-weight:800}
+  .fft-lab .terms b{color:var(--lab-muted)}
+  .fft-lab .numeric{color:var(--sl-color-accent-high);font-weight:700;white-space:nowrap}
+  .fft-lab .direct-graph svg{width:100%;height:165px}
+  .fft-lab .direct-graph line{stroke:var(--lab-orange);stroke-width:1;opacity:.42}
+  .fft-lab .direct-graph text{fill:var(--lab-muted);font:11px system-ui}
+  .fft-lab .reuse-stages{display:flex;align-items:center;justify-content:center;gap:.5rem;min-height:165px}
+  .fft-lab .reuse-stages div{display:grid;gap:.2rem;padding:.6rem;border-radius:8px;background:var(--lab-panel-2);text-align:center}
+  .fft-lab .reuse-stages span,.fft-lab .reuse-stages small{color:var(--lab-muted);font-size:.7rem}
+  .fft-lab .reuse-stages b{color:var(--lab-blue)}
+  .fft-lab .count-grid div{display:grid;gap:.2rem;padding:.75rem;border-radius:9px;background:var(--lab-deep)}
+  .fft-lab .count-grid span,.fft-lab .count-grid small{color:var(--lab-muted);font-size:.7rem}
+  .fft-lab .count-grid strong{font-size:1.35rem;color:var(--lab-text)}
+  .fft-lab .count-grid .saving{background:var(--sl-color-accent-low)}
+  .fft-lab .count-grid .saving strong{color:var(--lab-blue)}
+  .fft-lab .output-values button{display:grid;grid-template-columns:auto 1fr;align-items:baseline;gap:.55rem;min-height:42px;padding:.55rem .65rem;border:1px solid var(--lab-grid);border-radius:8px;background:var(--lab-deep);color:var(--lab-text);text-align:left;cursor:pointer}
+  .fft-lab .output-values button span{color:var(--lab-blue);font-weight:800}
+  .fft-lab .output-values button strong{justify-self:end;font:700 .78rem ui-monospace,monospace;overflow-wrap:anywhere}
+  .fft-lab .output-values button:focus-visible{outline:2px solid var(--lab-blue);outline-offset:2px}
+  .fft-lab .expanded-formula{display:block;width:100%;padding:.55rem .75rem;border:1px solid var(--lab-grid);border-radius:8px;background:var(--lab-deep);color:var(--lab-text);text-align:left;overflow-x:auto;cursor:pointer}
+  .fft-lab .expanded-formula .katex-display{margin:0;text-align:left}
+  .fft-lab .expanded-formula:focus-visible{outline:2px solid var(--lab-blue);outline-offset:2px}
+  .fft-lab .matrix-scroll{max-width:100%;overflow-x:auto;padding:.35rem .1rem .6rem}
+  .fft-lab .matrix-equation{display:flex;align-items:center;gap:.7rem;width:max-content;min-width:100%;justify-content:center}
+  .fft-lab .matrix-op{color:var(--lab-text);font:600 1.1rem ui-monospace,monospace}
+  .fft-lab .coefficient-matrix{position:relative;display:grid;grid-template-columns:repeat(var(--n),minmax(29px,auto));gap:.12rem .28rem;padding:.35rem .65rem}
+  .fft-lab .coefficient-matrix::before,.fft-lab .coefficient-matrix::after,.fft-lab .matrix-vector::before,.fft-lab .matrix-vector::after{content:'';position:absolute;inset-block:0;width:6px;border-block:1.5px solid var(--lab-grid)}
+  .fft-lab .coefficient-matrix::before,.fft-lab .matrix-vector::before{left:0;border-left:1.5px solid var(--lab-grid)}
+  .fft-lab .coefficient-matrix::after,.fft-lab .matrix-vector::after{right:0;border-right:1.5px solid var(--lab-grid)}
+  .fft-lab .coefficient-matrix button{min-width:29px;padding:.12rem;border:0;border-radius:4px;background:transparent;color:var(--lab-text);font:600 .7rem ui-monospace,monospace;cursor:pointer}
+  .fft-lab .coefficient-matrix button .katex{font-size:.82em}
+  .fft-lab .coefficient-matrix button:hover,.fft-lab .coefficient-matrix button:focus-visible{background:var(--sl-color-accent-low);outline:none}
+  .fft-lab .coefficient-matrix button.dim{opacity:.12}
+  .fft-lab .coefficient-matrix button.active{background:var(--sl-color-accent-low);box-shadow:inset 0 0 0 1px var(--lab-blue)}
+  .fft-lab .matrix-vector{position:relative;display:grid;align-self:stretch;align-content:space-around;min-width:58px;padding:.35rem .65rem;text-align:center}
+  .fft-lab .matrix-vector span{color:var(--lab-text);font:600 .7rem ui-monospace,monospace;white-space:nowrap}
+  .fft-lab .matrix-vector sub{font-size:.72em}
+  @media(max-width:650px){.fft-lab .equation-row{grid-template-columns:auto auto 1fr}.fft-lab .numeric{grid-column:3}.fft-lab .reuse-stages{flex-wrap:wrap}}
+</style>

@@ -1,6 +1,6 @@
 ---
 title: Lab — Hàm phân số hữu tỉ X(z)
-description: Đặt pole và zero trên mặt phẳng z, tự động tạo X(z) và quan sát bề mặt biên độ ba chiều.
+description: Đặt pole và zero trên mặt phẳng z, quan sát bề mặt biên độ và đáp ứng xung theo từng mode của pole.
 sidebar:
   order: 3
 ---
@@ -13,7 +13,8 @@ Sau thí nghiệm này, bạn có thể:
 
 - tạo một hàm phân số hữu tỉ từ vị trí và bậc của các zero, pole;
 - nhận ra zero tạo “hố” và pole tạo “đỉnh” trên bề mặt biên độ;
-- liên hệ biểu diễn pole–zero, dạng tích nhân tử và các đa thức tử số, mẫu số.
+- liên hệ biểu diễn pole–zero, dạng tích nhân tử và các đa thức tử số, mẫu số;
+- dự đoán đáp ứng xung tắt dần, tăng, đổi dấu hay dao động từ vị trí và bội số của pole.
 
 ## Cơ sở lý thuyết
 
@@ -26,6 +27,14 @@ $$
 
 trong đó $z_k$ là zero bậc $m_k$ và $p_\ell$ là pole bậc $n_\ell$. Trên bề mặt $20\log_{10}|X(z)|$, giá trị tiến xuống rất thấp gần zero và tăng rất cao gần pole. Lab giới hạn dải hiển thị để các cấu trúc này vẫn dễ quan sát.
 
+Để quan sát đáp ứng xung, lab diễn giải cùng tập pole–zero dưới dạng hệ nhân quả
+
+$$
+H(z)=\frac{\prod_k(1-z_kz^{-1})^{m_k}}{\prod_\ell(1-p_\ell z^{-1})^{n_\ell}},
+$$
+
+và tính $h[n]$ khi $x[n]=\delta[n]$. Với một pole đơn $p$, mode cơ bản có dạng $p^n u[n]$: pole thực dương cho exponential cùng dấu, pole thực âm cho chuỗi đổi dấu, còn cặp pole phức $re^{\pm j\omega}$ tạo dao động có bao biên $r^n$. Vì vậy $r<1$ làm mode tắt dần, $r=1$ duy trì biên độ và $r>1$ làm mode tăng. Pole bội $q$ còn tạo thừa số đa thức theo $n$, chẳng hạn pole kép sinh dạng gần với $(n+1)p^n u[n]$.
+
 <RationalZSurfaceLab />
 
 ## Hoạt động gợi ý
@@ -33,6 +42,8 @@ trong đó $z_k$ là zero bậc $m_k$ và $p_\ell$ là pole bậc $n_\ell$. Trê
 1. Xóa cấu hình ban đầu, đặt một zero tại gốc và một pole tại $0.8$. So sánh hai vùng quanh chúng.
 2. Tăng pole tại $0.8$ từ bậc 1 lên bậc 2. Quan sát độ dốc của đỉnh thay đổi thế nào.
 3. Tạo một cặp pole liên hợp $0.7\pm j0.5$. Xoay bề mặt để kiểm tra tính đối xứng qua trục thực.
+4. Dùng lần lượt sáu preset mode và đối chiếu vị trí pole với stem plot. Chú ý dấu, tần số dao động và bao biên.
+5. Nhấn **Xóa mọi zero**, giữ nguyên pole, rồi thêm từng zero trở lại để phân biệt mode tự nhiên do pole với tác động định hình của zero.
 
 :::tip[Điều khiển]
 Click vùng trống để mở menu thêm điểm; kéo trực tiếp zero hoặc pole để di chuyển. Nếu dùng bàn phím, nhập tọa độ trong biểu mẫu hoặc focus mặt phẳng rồi dùng phím mũi tên để di chuyển điểm cuối danh sách. Trên đồ thị 3D, kéo chuột/chạm hoặc dùng phím mũi tên để đổi góc nhìn.
@@ -45,3 +56,5 @@ Chọn **Hệ thực** khi muốn các hệ số của $A(z)$ và $B(z)$ là s�
 1. Vì sao pole bậc hai tạo đỉnh dốc hơn pole đơn?
 2. Điều kiện nào trên các hệ số của $A(z)$ và $B(z)$ khiến pole, zero phức xuất hiện thành từng cặp liên hợp?
 3. Nếu một pole và một zero trùng hoàn toàn vị trí và cùng bậc, bề mặt biên độ sẽ thay đổi ra sao?
+4. Hai cặp pole có cùng bán kính nhưng góc khác nhau sẽ cho stem plot giống và khác nhau ở điểm nào?
+5. Vì sao một pole kép nằm trong đường tròn đơn vị vẫn ổn định dù đáp ứng có thể tăng trong một số mẫu đầu?
